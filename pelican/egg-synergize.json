@@ -1,0 +1,164 @@
+{
+    "_comment": "Synergize CS2 Community Platform - Pelican Panel Egg",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2024-12-07T00:00:00+00:00",
+    "name": "Synergize Platform",
+    "author": "synergize@example.com",
+    "description": "A full-stack CS2 community platform with Next.js frontend and Laravel backend. Features server browser, leaderboards, ban management, shop, and admin panel with Steam authentication.",
+    "features": null,
+    "docker_images": {
+        "PHP 8.3 + Node 20": "ghcr.io/parkervcp/yolks:nodejs_20_php_8.3",
+        "PHP 8.2 + Node 20": "ghcr.io/parkervcp/yolks:nodejs_20_php_8.2",
+        "PHP 8.2 + Node 18": "ghcr.io/parkervcp/yolks:nodejs_18_php_8.2"
+    },
+    "file_denylist": [],
+    "startup": "cd /home/container && ./scripts/start.sh",
+    "config": {
+        "files": "{}",
+        "startup": "{\"done\": \"Synergize platform is running\"}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\napt update\napt install -y curl wget unzip git jq\n\ncd /home/container\n\n# Create directory structure\nmkdir -p frontend backend scripts logs storage\n\n# Download latest release or clone from git\nif [ ! -z \"${GITHUB_RELEASE_URL}\" ] && [ \"${GITHUB_RELEASE_URL}\" != \"null\" ]; then\n    echo \"Downloading from release URL...\"\n    wget -O release.zip \"${GITHUB_RELEASE_URL}\"\n    unzip -o release.zip\n    rm release.zip\nelif [ ! -z \"${GIT_REPO}\" ] && [ \"${GIT_REPO}\" != \"null\" ]; then\n    echo \"Cloning from Git repository...\"\n    if [ ! -z \"${GIT_TOKEN}\" ] && [ \"${GIT_TOKEN}\" != \"null\" ]; then\n        git clone --depth 1 --branch ${GIT_BRANCH:-main} https://${GIT_TOKEN}@${GIT_REPO#https://} .\n    else\n        git clone --depth 1 --branch ${GIT_BRANCH:-main} ${GIT_REPO} .\n    fi\nelse\n    echo \"No release URL or Git repo specified. Creating placeholder structure...\"\n    mkdir -p frontend/app frontend/components frontend/lib frontend/public\n    mkdir -p backend/app backend/database backend/routes backend/config\nfi\n\n# Install backend dependencies\nif [ -f \"backend/composer.json\" ]; then\n    echo \"Installing PHP dependencies...\"\n    cd /home/container/backend\n    composer install --no-dev --optimize-autoloader --no-interaction\n    \n    # Generate app key if not exists\n    if [ ! -f \".env\" ]; then\n        cp .env.example .env 2>/dev/null || true\n    fi\n    php artisan key:generate --force 2>/dev/null || true\nfi\n\n# Install frontend dependencies\nif [ -f \"/home/container/frontend/package.json\" ]; then\n    echo \"Installing Node.js dependencies...\"\n    cd /home/container/frontend\n    npm install --production\n    \n    # Build if not pre-built\n    if [ ! -d \".next\" ]; then\n        echo \"Building Next.js application...\"\n        npm run build\n    fi\nfi\n\n# Create start script\ncat > /home/container/scripts/start.sh << 'STARTSCRIPT'\n#!/bin/bash\ncd /home/container\n\n# Configure environment\nexport APP_URL=\"${APP_URL:-http://localhost}\"\nexport DB_CONNECTION=\"pgsql\"\nexport DB_HOST=\"${DB_HOST}\"\nexport DB_PORT=\"${DB_PORT:-5432}\"\nexport DB_DATABASE=\"${DB_DATABASE}\"\nexport DB_USERNAME=\"${DB_USERNAME}\"\nexport DB_PASSWORD=\"${DB_PASSWORD}\"\nexport STEAM_API_KEY=\"${STEAM_API_KEY}\"\n\n# Update backend .env\nif [ -f \"backend/.env.example\" ]; then\n    cp backend/.env.example backend/.env\nfi\n\nif [ -f \"backend/.env\" ]; then\n    sed -i \"s|APP_URL=.*|APP_URL=${APP_URL}|g\" backend/.env\n    sed -i \"s|DB_CONNECTION=.*|DB_CONNECTION=pgsql|g\" backend/.env\n    sed -i \"s|DB_HOST=.*|DB_HOST=${DB_HOST}|g\" backend/.env\n    sed -i \"s|DB_PORT=.*|DB_PORT=${DB_PORT}|g\" backend/.env\n    sed -i \"s|DB_DATABASE=.*|DB_DATABASE=${DB_DATABASE}|g\" backend/.env\n    sed -i \"s|DB_USERNAME=.*|DB_USERNAME=${DB_USERNAME}|g\" backend/.env\n    sed -i \"s|DB_PASSWORD=.*|DB_PASSWORD=${DB_PASSWORD}|g\" backend/.env\n    sed -i \"s|STEAM_API_KEY=.*|STEAM_API_KEY=${STEAM_API_KEY}|g\" backend/.env\nfi\n\n# Run migrations\nif [ -f \"backend/artisan\" ]; then\n    echo \"Running database migrations...\"\n    cd backend\n    php artisan migrate --force 2>&1 || echo \"Migration warning (may be first run)\"\n    php artisan config:cache 2>/dev/null || true\n    php artisan route:cache 2>/dev/null || true\n    cd ..\nfi\n\n# Create frontend .env.local\nif [ -d \"frontend\" ]; then\n    echo \"NEXT_PUBLIC_API_URL=${APP_URL}\" > frontend/.env.local\n    echo \"NEXT_PUBLIC_APP_NAME=Synergize\" >> frontend/.env.local\nfi\n\necho \"========================================\"\necho \"  Synergize CS2 Community Platform\"\necho \"========================================\"\necho \"\"\necho \"Starting services...\"\necho \"\"\n\n# Start Laravel backend (port from SERVER_PORT or 8000)\nBACKEND_PORT=${BACKEND_PORT:-8000}\nFRONTEND_PORT=${SERVER_PORT:-3000}\n\ncd /home/container/backend\nphp artisan serve --host=0.0.0.0 --port=${BACKEND_PORT} > ../logs/backend.log 2>&1 &\nBACKEND_PID=$!\necho \"Backend started on port ${BACKEND_PORT} (PID: ${BACKEND_PID})\"\n\n# Start Next.js frontend\ncd /home/container/frontend\nif [ -d \".next\" ]; then\n    npm run start -- -p ${FRONTEND_PORT} > ../logs/frontend.log 2>&1 &\nelse\n    npm run dev -- -p ${FRONTEND_PORT} > ../logs/frontend.log 2>&1 &\nfi\nFRONTEND_PID=$!\necho \"Frontend started on port ${FRONTEND_PORT} (PID: ${FRONTEND_PID})\"\n\necho \"\"\necho \"Synergize platform is running\"\necho \"Frontend: http://0.0.0.0:${FRONTEND_PORT}\"\necho \"Backend API: http://0.0.0.0:${BACKEND_PORT}\"\necho \"\"\n\n# Keep container running and handle shutdown\ntrap \"kill ${BACKEND_PID} ${FRONTEND_PID} 2>/dev/null; exit 0\" SIGTERM SIGINT\n\n# Wait for either process to exit\nwait -n ${BACKEND_PID} ${FRONTEND_PID}\n\n# If one dies, kill the other and exit\nkill ${BACKEND_PID} ${FRONTEND_PID} 2>/dev/null\nexit 1\nSTARTSCRIPT\n\nchmod +x /home/container/scripts/start.sh\n\necho \"Installation complete!\"\n",
+            "container": "ghcr.io/parkervcp/installers:debian",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Application URL",
+            "description": "The public URL where Synergize will be accessible (e.g., https://synergize.example.com)",
+            "env_variable": "APP_URL",
+            "default_value": "http://localhost:3000",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Host",
+            "description": "PostgreSQL database host address",
+            "env_variable": "DB_HOST",
+            "default_value": "localhost",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Port",
+            "description": "PostgreSQL database port",
+            "env_variable": "DB_PORT",
+            "default_value": "5432",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Name",
+            "description": "Name of the PostgreSQL database",
+            "env_variable": "DB_DATABASE",
+            "default_value": "synergize",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Username",
+            "description": "PostgreSQL database username",
+            "env_variable": "DB_USERNAME",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Password",
+            "description": "PostgreSQL database password",
+            "env_variable": "DB_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Steam API Key",
+            "description": "Steam Web API key for authentication. Get one at https://steamcommunity.com/dev/apikey",
+            "env_variable": "STEAM_API_KEY",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "GitHub Release URL",
+            "description": "Direct URL to the release zip file (leave empty to use Git repo instead)",
+            "env_variable": "GITHUB_RELEASE_URL",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Repository",
+            "description": "Git repository URL (e.g., https://github.com/user/synergize.git)",
+            "env_variable": "GIT_REPO",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Branch",
+            "description": "Git branch to clone",
+            "env_variable": "GIT_BRANCH",
+            "default_value": "main",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Access Token",
+            "description": "Personal access token for private repositories (leave empty for public repos)",
+            "env_variable": "GIT_TOKEN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Backend Port",
+            "description": "Port for the Laravel API backend (internal)",
+            "env_variable": "BACKEND_PORT",
+            "default_value": "8000",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer",
+            "field_type": "text"
+        },
+        {
+            "name": "Auto Update",
+            "description": "Automatically pull latest code on startup (only works with Git repo)",
+            "env_variable": "AUTO_UPDATE",
+            "default_value": "false",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:true,false",
+            "field_type": "text"
+        }
+    ]
+}
