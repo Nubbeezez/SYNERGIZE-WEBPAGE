@@ -6,8 +6,9 @@ A modern, full-stack gaming community platform for Counter-Strike 2 servers feat
 
 - **Frontend**: Next.js 14 (App Router) + TypeScript + TailwindCSS
 - **Backend**: Laravel 11 + PHP 8.2+
-- **Database**: PostgreSQL
-- **Auth**: Steam OpenID
+- **Database**: PostgreSQL / MySQL
+- **Cache**: Redis (optional)
+- **Auth**: Steam OpenID + Laravel Sanctum
 
 ## Quick Links
 
@@ -75,10 +76,39 @@ See [Full Deployment Guide](docs/PELICAN_DEPLOYMENT.md) for detailed instruction
 - **Server Control**: Push configurations to game servers
 - **Audit Logs**: Complete history of all admin actions
 
-### Authentication
+### Authentication & Authorization
 - Steam OpenID login (no passwords to manage)
-- Role-based access control (Superadmin, Admin, Moderator, User)
-- Session management with secure cookies
+- Role-based access control with hierarchy:
+  - **Owner** (100): Full access to everything
+  - **Manager** (30): Almost full access, user management
+  - **Head Admin** (20): Leads admin teams
+  - **Admin/Senior Admin** (10): Ban management, shop viewing
+  - **VIP** (1): Premium perks
+  - **User** (0): Basic access
+- Session management with secure encrypted cookies
+- 7-day token expiration with auto-renewal
+
+---
+
+## Security Features
+
+The platform implements comprehensive security measures:
+
+### Backend Security
+- **Rate Limiting**: Tiered limits for API (60/min), admin (30/min), auth (5/min), and sensitive operations (10/min)
+- **SQL Injection Prevention**: Parameterized queries and LIKE wildcard escaping
+- **CORS Protection**: Restricted origins, methods, and headers
+- **Security Headers**: X-Frame-Options, X-Content-Type-Options, CSP, HSTS
+- **Session Security**: Encrypted sessions, secure cookies, strict SameSite policy
+- **Input Validation**: Form Request classes with type validation
+- **Atomic Transactions**: Race condition prevention for purchases and bans
+- **IP Validation**: Server IPs validated and private ranges blocked
+- **Audit Logging**: All admin actions logged with IP and user agent
+
+### Frontend Security
+- **Route Protection**: Middleware for protected routes
+- **Security Headers**: Applied to all responses
+- **Role-based UI**: Components hidden based on permission level
 
 ---
 
@@ -88,21 +118,24 @@ See [Full Deployment Guide](docs/PELICAN_DEPLOYMENT.md) for detailed instruction
 synergize/
 ├── frontend/                 # Next.js application
 │   ├── app/                  # App router pages
+│   │   └── admin/           # Admin panel pages
 │   ├── components/           # React components
-│   │   └── ui/              # Base UI components
-│   ├── lib/                  # Utilities and API client
+│   │   └── ui/              # Reusable UI components (Modal, Button, Input, etc.)
+│   ├── lib/                  # Utilities, API client, auth context
+│   ├── middleware.ts         # Route protection & security headers
 │   └── public/              # Static assets
 │
 ├── backend/                  # Laravel API
 │   ├── app/
-│   │   ├── Http/Controllers/ # API controllers
+│   │   ├── Http/
+│   │   │   ├── Controllers/  # API controllers (public & admin)
+│   │   │   ├── Middleware/   # Auth, rate limiting, security headers
+│   │   │   └── Requests/     # Form request validation classes
 │   │   ├── Models/          # Eloquent models
-│   │   └── Services/        # Business logic
+│   │   └── Services/        # Business logic (Steam auth, etc.)
+│   ├── config/              # App configuration
 │   ├── database/migrations/ # Database schema
-│   └── routes/              # API routes
-│
-├── pelican/                  # Pelican Panel files
-│   └── egg-synergize.json   # Panel egg configuration
+│   └── routes/api.php       # API routes with middleware
 │
 ├── docs/                     # Documentation
 │   ├── PELICAN_DEPLOYMENT.md
@@ -111,8 +144,6 @@ synergize/
 │   └── CONTRIBUTING.md
 │
 └── scripts/                  # Build and deployment scripts
-    ├── build.sh
-    └── start.sh
 ```
 
 ---
@@ -165,6 +196,10 @@ APP_KEY=base64:generated_key_here
 APP_DEBUG=false
 APP_URL=https://your-domain.com
 
+# Frontend URL for CORS
+FRONTEND_URL=https://your-frontend-domain.com
+
+# Database (PostgreSQL or MySQL)
 DB_CONNECTION=pgsql
 DB_HOST=your-db-host
 DB_PORT=5432
@@ -172,12 +207,27 @@ DB_DATABASE=synergize
 DB_USERNAME=your_user
 DB_PASSWORD=your_password
 
+# Steam Authentication
 STEAM_API_KEY=your_steam_api_key
 STEAM_CALLBACK_URL=https://your-domain.com/api/v1/auth/steam/callback
 
+# Session & Security
+SESSION_DRIVER=database
+SESSION_ENCRYPT=true
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=strict
+
+# Token expiration (minutes) - default 7 days
+SANCTUM_TOKEN_EXPIRATION=10080
+
+# Cache & Queue
 CACHE_DRIVER=file
 QUEUE_CONNECTION=database
-SESSION_DRIVER=database
+
+# Optional: Redis for better performance
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
 ```
 
 #### Frontend (.env.local)
@@ -205,13 +255,66 @@ Base URL: `/api/v1`
 - `GET /auth/steam/callback` - Steam callback
 - `GET /users/me` - Current user profile
 
-### Admin Endpoints (requires auth)
-- `POST /admin/bans` - Create ban
-- `DELETE /admin/bans/:id` - Remove ban
-- `POST /admin/assign-role` - Assign admin role
-- `GET /admin/logs` - View audit logs
+### Admin Endpoints (requires auth + role)
+
+#### Ban Management (Admin+)
+- `GET /admin/bans` - List all bans
+- `POST /admin/bans` - Create ban (rate limited)
+- `DELETE /admin/bans/:id` - Remove ban (rate limited)
+
+#### User Management (Manager+)
+- `GET /admin/users` - List users with pagination
+- `GET /admin/users/:id` - Get user details
+- `PUT /admin/users/:id/roles` - Update user roles (rate limited)
+- `GET /admin/users/search/:query` - Search users (rate limited)
+
+#### Server Management (Owner only)
+- `GET /admin/servers` - List servers with RCON status
+- `POST /admin/servers` - Create server
+- `PUT /admin/servers/:id` - Update server
+- `DELETE /admin/servers/:id` - Delete server
+
+#### Shop Management (Owner only for modifications)
+- `GET /admin/shop` - List all items
+- `POST /admin/shop` - Create item
+- `PUT /admin/shop/:id` - Update item
+- `DELETE /admin/shop/:id` - Delete item
+
+#### Settings (Owner only)
+- `GET /admin/settings` - Get all settings
+- `PUT /admin/settings` - Update single setting
+- `PUT /admin/settings/batch` - Update multiple settings
+
+#### Audit Logs (Admin+)
+- `GET /admin/logs` - View audit logs with filters
 
 See [API Documentation](docs/API.md) for full details.
+
+---
+
+## UI Components
+
+The frontend includes a library of reusable UI components in `frontend/components/ui/`:
+
+| Component | Description |
+|-----------|-------------|
+| `Modal` | Accessible modal dialog with backdrop |
+| `ConfirmDialog` | Confirmation dialog with danger/warning variants |
+| `Button` | Button with variants (primary, secondary, outline, ghost, danger) |
+| `Input` | Form input with label, error, and helper text |
+| `Select` | Dropdown select with custom styling |
+| `Badge` | Status badges (success, warning, error, info) |
+| `Spinner` | Loading spinner in multiple sizes |
+| `Alert` | Alert messages with dismiss functionality |
+
+Usage example:
+```tsx
+import { Button, Modal, Input } from '@/components/ui'
+
+<Button variant="primary" isLoading={loading}>
+  Save Changes
+</Button>
+```
 
 ---
 
