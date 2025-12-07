@@ -30,6 +30,16 @@
     },
     "variables": [
         {
+            "name": "Server Port",
+            "description": "Port the web server listens on. Must match your Pelican allocation.",
+            "env_variable": "PORT",
+            "default_value": "3000",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:1,65535",
+            "field_type": "text"
+        },
+        {
             "name": "Git Repository",
             "description": "Git repository URL (e.g., https://github.com/user/synergize.git). Leave empty for test mode.",
             "env_variable": "GIT_REPO",

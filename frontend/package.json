@@ -4,7 +4,7 @@
   "description": "Synergize CS2 Community Platform - Frontend",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0",
+    "dev": "next dev -H 0.0.0.0 -p ${PORT:-3000}",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
