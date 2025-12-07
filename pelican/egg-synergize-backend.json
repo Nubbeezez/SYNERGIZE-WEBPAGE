@@ -1,0 +1,163 @@
+{
+    "_comment": "Synergize Platform - Laravel Backend API",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2024-12-07T00:00:00+00:00",
+    "name": "Synergize Backend (Laravel)",
+    "author": "synergize@example.com",
+    "description": "Synergize CS2 Community Platform - Laravel API backend with PostgreSQL/MySQL and Redis support.",
+    "features": null,
+    "docker_images": {
+        "PHP 8.3": "ghcr.io/parkervcp/yolks:php_8.3",
+        "PHP 8.2": "ghcr.io/parkervcp/yolks:php_8.2"
+    },
+    "file_denylist": [],
+    "startup": "cd /home/container/backend && php artisan serve --host=0.0.0.0 --port=${PORT}",
+    "config": {
+        "files": "{}",
+        "startup": "{\"done\": \"Server running on|Application starting\"}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\nset -e\n\necho \"========================================\"\necho \"  SYNERGIZE BACKEND - INSTALLATION\"\necho \"========================================\"\necho \"\"\n\n# Install dependencies\necho \"[STEP 1/6] Installing system dependencies...\"\napt update -qq\napt install -y git curl unzip > /dev/null 2>&1\necho \"[OK] Dependencies installed\"\necho \"\"\n\n# Setup directory\necho \"[STEP 2/6] Setting up directory...\"\nmkdir -p /mnt/server\ncd /mnt/server\n\nif [ \"$(ls -A /mnt/server 2>/dev/null)\" ]; then\n    echo \"[INFO] Directory not empty, cleaning...\"\n    rm -rf /mnt/server/* /mnt/server/.[!.]* 2>/dev/null || true\nfi\necho \"\"\n\n# Clone repository\necho \"[STEP 3/6] Downloading source code...\"\nif [ -z \"${GIT_REPO}\" ] || [ \"${GIT_REPO}\" = \"null\" ]; then\n    echo \"[ERROR] GIT_REPO is required!\"\n    exit 1\nfi\n\necho \"[INFO] Repository: ${GIT_REPO}\"\necho \"[INFO] Branch: ${GIT_BRANCH:-master}\"\n\nif [ ! -z \"${GIT_TOKEN}\" ] && [ \"${GIT_TOKEN}\" != \"null\" ]; then\n    git clone --depth 1 --branch ${GIT_BRANCH:-master} https://${GIT_TOKEN}@${GIT_REPO#https://} /mnt/server\nelse\n    git clone --depth 1 --branch ${GIT_BRANCH:-master} ${GIT_REPO} /mnt/server\nfi\necho \"[OK] Repository cloned\"\necho \"\"\n\n# Install Composer dependencies\necho \"[STEP 4/6] Installing PHP dependencies...\"\nif [ -f \"/mnt/server/backend/composer.json\" ]; then\n    cd /mnt/server/backend\n    \n    # Install composer if not present\n    if [ ! -f \"composer.phar\" ]; then\n        curl -sS https://getcomposer.org/installer | php\n    fi\n    \n    php composer.phar install --no-dev --optimize-autoloader 2>&1 | tail -10\n    echo \"[OK] Composer dependencies installed\"\nelse\n    echo \"[ERROR] backend/composer.json not found!\"\n    ls -la /mnt/server\n    exit 1\nfi\necho \"\"\n\n# Setup environment\necho \"[STEP 5/6] Setting up environment...\"\ncd /mnt/server/backend\n\nif [ ! -f \".env\" ]; then\n    if [ -f \".env.example\" ]; then\n        cp .env.example .env\n        echo \"[OK] Created .env from .env.example\"\n    else\n        echo \"[WARN] No .env.example found\"\n    fi\nelse\n    echo \"[INFO] .env already exists\"\nfi\n\n# Generate app key if needed\nif grep -q \"APP_KEY=$\" .env 2>/dev/null || grep -q \"APP_KEY=base64:$\" .env 2>/dev/null; then\n    php artisan key:generate --force\n    echo \"[OK] Application key generated\"\nfi\necho \"\"\n\n# Cache config for production\necho \"[STEP 6/6] Optimizing for production...\"\nphp artisan config:cache 2>/dev/null || true\nphp artisan route:cache 2>/dev/null || true\nphp artisan view:cache 2>/dev/null || true\necho \"[OK] Caches built\"\necho \"\"\n\n# Summary\necho \"========================================\"\necho \"  INSTALLATION COMPLETE\"\necho \"========================================\"\necho \"\"\necho \"[IMPORTANT] Configure these variables in Pelican:\"\necho \"  - DB_CONNECTION: pgsql (PostgreSQL) or mysql\"\necho \"  - DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD\"\necho \"  - STEAM_API_KEY (for Steam authentication)\"\necho \"\"\necho \"Then run: php artisan migrate\"\necho \"\"\n",
+            "container": "ghcr.io/parkervcp/installers:debian",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Server Port",
+            "description": "Port the API server listens on. Must match your Pelican allocation.",
+            "env_variable": "PORT",
+            "default_value": "8000",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:1,65535",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Repository",
+            "description": "Git repository URL",
+            "env_variable": "GIT_REPO",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Branch",
+            "description": "Git branch to clone",
+            "env_variable": "GIT_BRANCH",
+            "default_value": "master",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Access Token",
+            "description": "Personal access token for private repos",
+            "env_variable": "GIT_TOKEN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Connection",
+            "description": "Database driver (pgsql for PostgreSQL, mysql for MySQL)",
+            "env_variable": "DB_CONNECTION",
+            "default_value": "pgsql",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:pgsql,mysql",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Host",
+            "description": "Database server host",
+            "env_variable": "DB_HOST",
+            "default_value": "127.0.0.1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Port",
+            "description": "Database port (5432 for PostgreSQL, 3306 for MySQL)",
+            "env_variable": "DB_PORT",
+            "default_value": "5432",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Name",
+            "description": "Database name",
+            "env_variable": "DB_DATABASE",
+            "default_value": "synergize",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Username",
+            "description": "Database username",
+            "env_variable": "DB_USERNAME",
+            "default_value": "synergize",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Database Password",
+            "description": "Database password",
+            "env_variable": "DB_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "App Environment",
+            "description": "Application environment (local, production)",
+            "env_variable": "APP_ENV",
+            "default_value": "production",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:local,production",
+            "field_type": "text"
+        },
+        {
+            "name": "App Debug",
+            "description": "Enable debug mode (true/false)",
+            "env_variable": "APP_DEBUG",
+            "default_value": "false",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:true,false",
+            "field_type": "text"
+        },
+        {
+            "name": "Steam API Key",
+            "description": "Steam Web API key for authentication",
+            "env_variable": "STEAM_API_KEY",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": "nullable|string",
+            "field_type": "text"
+        }
+    ]
+}

@@ -1,29 +1,29 @@
 {
-    "_comment": "Synergize Platform - Simplified Egg (Fixed paths)",
+    "_comment": "Synergize Platform - Frontend Only",
     "meta": {
         "version": "PTDL_v2",
         "update_url": null
     },
     "exported_at": "2024-12-07T00:00:00+00:00",
-    "name": "Synergize Platform (Simple)",
+    "name": "Synergize Frontend (Next.js)",
     "author": "synergize@example.com",
-    "description": "Simplified Synergize egg - Node.js frontend only. Use this for testing.",
+    "description": "Synergize CS2 Community Platform - Next.js frontend. Features server browser, leaderboards, shop, and admin panel.",
     "features": null,
     "docker_images": {
         "Node 20": "ghcr.io/parkervcp/yolks:nodejs_20",
         "Node 18": "ghcr.io/parkervcp/yolks:nodejs_18"
     },
     "file_denylist": [],
-    "startup": "if [ -d frontend ]; then cd frontend && npm install && npm run dev; elif [ -f package.json ]; then npm install && npm run dev; elif [ -f test.js ]; then node test.js; else echo 'No files found - please reinstall'; fi",
+    "startup": "cd /home/container/frontend && if [ -d .next ]; then npm run start -- -H 0.0.0.0 -p ${PORT}; else npm install && npm run build && npm run start -- -H 0.0.0.0 -p ${PORT}; fi",
     "config": {
         "files": "{}",
-        "startup": "{\"done\": \"ready started server on|Synergize test running\"}",
+        "startup": "{\"done\": \"Ready in|ready started server on|Listening on\"}",
         "logs": "{}",
         "stop": "^C"
     },
     "scripts": {
         "installation": {
-            "script": "#!/bin/bash\necho \"========================================\"\necho \"  SYNERGIZE - SIMPLE INSTALL\"\necho \"========================================\"\necho \"\"\necho \"[INFO] Starting installation...\"\necho \"[INFO] Date: $(date)\"\necho \"\"\n\n# Install dependencies\necho \"[STEP 1/4] Installing system dependencies...\"\napt update\napt install -y git curl jq\necho \"[OK] Dependencies installed\"\necho \"\"\n\n# IMPORTANT: Use /mnt/server for installation (Pelican maps this to /home/container)\necho \"[STEP 2/4] Setting up directory...\"\nmkdir -p /mnt/server\ncd /mnt/server\necho \"[INFO] Working directory: $(pwd)\"\necho \"[INFO] Contents before:\"\nls -la\necho \"\"\n\n# Download code or create test file\necho \"[STEP 3/4] Downloading source code...\"\nif [ -z \"${GIT_REPO}\" ] || [ \"${GIT_REPO}\" = \"null\" ] || [ \"${GIT_REPO}\" = \"\" ]; then\n    echo \"[INFO] No GIT_REPO set - creating test file\"\n    cat > /mnt/server/test.js << 'TESTFILE'\nconsole.log(\"========================================\");\nconsole.log(\"  Synergize test running!\");\nconsole.log(\"========================================\");\nconsole.log(\"\");\nconsole.log(\"The egg is working correctly.\");\nconsole.log(\"Now you can set GIT_REPO to your repository\");\nconsole.log(\"and reinstall to fetch your actual code.\");\nconsole.log(\"\");\nconsole.log(\"Keeping server alive...\");\nsetInterval(() => {\n    console.log(\"[\" + new Date().toISOString() + \"] Still running...\");\n}, 30000);\nTESTFILE\n    echo \"[OK] Created test.js\"\nelse\n    echo \"[INFO] Cloning: ${GIT_REPO}\"\n    echo \"[INFO] Branch: ${GIT_BRANCH:-main}\"\n    \n    # Clean directory first if needed\n    if [ \"$(ls -A /mnt/server 2>/dev/null)\" ]; then\n        echo \"[INFO] Directory not empty, cleaning...\"\n        rm -rf /mnt/server/* /mnt/server/.[!.]* 2>/dev/null || true\n    fi\n    \n    # Clone the repo\n    if [ ! -z \"${GIT_TOKEN}\" ] && [ \"${GIT_TOKEN}\" != \"null\" ] && [ \"${GIT_TOKEN}\" != \"\" ]; then\n        echo \"[INFO] Using authentication token\"\n        git clone --branch ${GIT_BRANCH:-main} https://${GIT_TOKEN}@${GIT_REPO#https://} /mnt/server\n    else\n        echo \"[INFO] Cloning public repo\"\n        git clone --branch ${GIT_BRANCH:-main} ${GIT_REPO} /mnt/server\n    fi\n    \n    if [ $? -eq 0 ]; then\n        echo \"[OK] Repository cloned successfully\"\n    else\n        echo \"[ERROR] Git clone failed!\"\n        exit 1\n    fi\nfi\necho \"\"\n\n# Show what we got\necho \"[STEP 4/4] Installation summary\"\necho \"========================================\"\necho \"Contents of /mnt/server:\"\nls -la /mnt/server\necho \"========================================\"\necho \"\"\necho \"[DONE] Installation complete!\"\necho \"[INFO] You can now START the server\"\necho \"\"\n",
+            "script": "#!/bin/bash\nset -e\n\necho \"========================================\"\necho \"  SYNERGIZE PLATFORM - INSTALLATION\"\necho \"========================================\"\necho \"\"\necho \"[INFO] Date: $(date)\"\necho \"[INFO] Installing to: /mnt/server\"\necho \"\"\n\n# Install dependencies\necho \"[STEP 1/5] Installing system dependencies...\"\napt update -qq\napt install -y git curl jq > /dev/null 2>&1\necho \"[OK] Dependencies installed\"\necho \"\"\n\n# Setup directory\necho \"[STEP 2/5] Setting up directory...\"\nmkdir -p /mnt/server\ncd /mnt/server\n\n# Clean if needed\nif [ \"$(ls -A /mnt/server 2>/dev/null)\" ]; then\n    echo \"[INFO] Directory not empty, cleaning...\"\n    rm -rf /mnt/server/* /mnt/server/.[!.]* 2>/dev/null || true\nfi\necho \"\"\n\n# Clone repository\necho \"[STEP 3/5] Downloading source code...\"\nif [ -z \"${GIT_REPO}\" ] || [ \"${GIT_REPO}\" = \"null\" ]; then\n    echo \"[ERROR] GIT_REPO is required!\"\n    echo \"[INFO] Set GIT_REPO to your GitHub repository URL\"\n    exit 1\nfi\n\necho \"[INFO] Repository: ${GIT_REPO}\"\necho \"[INFO] Branch: ${GIT_BRANCH:-master}\"\n\nif [ ! -z \"${GIT_TOKEN}\" ] && [ \"${GIT_TOKEN}\" != \"null\" ]; then\n    echo \"[INFO] Using authentication token\"\n    git clone --depth 1 --branch ${GIT_BRANCH:-master} https://${GIT_TOKEN}@${GIT_REPO#https://} /mnt/server\nelse\n    git clone --depth 1 --branch ${GIT_BRANCH:-master} ${GIT_REPO} /mnt/server\nfi\n\nif [ $? -ne 0 ]; then\n    echo \"[ERROR] Git clone failed!\"\n    exit 1\nfi\necho \"[OK] Repository cloned\"\necho \"\"\n\n# Install npm dependencies\necho \"[STEP 4/5] Installing npm dependencies...\"\nif [ -f \"/mnt/server/frontend/package.json\" ]; then\n    cd /mnt/server/frontend\n    echo \"[INFO] Found frontend/package.json\"\n    npm install --legacy-peer-deps 2>&1 | tail -5\n    echo \"[OK] Dependencies installed\"\nelse\n    echo \"[ERROR] frontend/package.json not found!\"\n    ls -la /mnt/server\n    exit 1\nfi\necho \"\"\n\n# Build Next.js\necho \"[STEP 5/5] Building Next.js for production...\"\ncd /mnt/server/frontend\necho \"[INFO] This may take a few minutes...\"\nnpm run build 2>&1 | tail -20\n\nif [ -d \".next\" ]; then\n    echo \"[OK] Build successful!\"\n    echo \"[INFO] Build size: $(du -sh .next | cut -f1)\"\nelse\n    echo \"[WARN] Build may have failed - .next not found\"\n    echo \"[INFO] Will attempt build on startup\"\nfi\necho \"\"\n\n# Summary\necho \"========================================\"\necho \"  INSTALLATION COMPLETE\"\necho \"========================================\"\necho \"\"\necho \"Contents of /mnt/server:\"\nls -la /mnt/server\necho \"\"\necho \"Frontend folder:\"\nls -la /mnt/server/frontend | head -15\necho \"\"\necho \"[DONE] You can now START the server!\"\necho \"\"\n",
             "container": "ghcr.io/parkervcp/installers:debian",
             "entrypoint": "bash"
         }
@@ -41,19 +41,19 @@
         },
         {
             "name": "Git Repository",
-            "description": "Git repository URL (e.g., https://github.com/user/synergize.git). Leave empty for test mode.",
+            "description": "Git repository URL (e.g., https://github.com/user/synergize.git)",
             "env_variable": "GIT_REPO",
             "default_value": "",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "nullable|string",
+            "rules": "required|string",
             "field_type": "text"
         },
         {
             "name": "Git Branch",
             "description": "Git branch to clone",
             "env_variable": "GIT_BRANCH",
-            "default_value": "main",
+            "default_value": "master",
             "user_viewable": true,
             "user_editable": true,
             "rules": "nullable|string",
@@ -64,6 +64,16 @@
             "description": "Personal access token for private repos (leave empty for public)",
             "env_variable": "GIT_TOKEN",
             "default_value": "",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "API URL",
+            "description": "Backend API URL (for future use with Laravel backend)",
+            "env_variable": "NEXT_PUBLIC_API_URL",
+            "default_value": "http://localhost:8000",
             "user_viewable": true,
             "user_editable": true,
             "rules": "nullable|string",
