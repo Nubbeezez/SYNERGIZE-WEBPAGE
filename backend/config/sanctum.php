@@ -29,9 +29,11 @@ return [
     |--------------------------------------------------------------------------
     | Expiration Minutes
     |--------------------------------------------------------------------------
+    | Tokens expire after 7 days (10080 minutes) for security.
+    | Users will need to re-authenticate after this period.
     */
 
-    'expiration' => null,
+    'expiration' => env('SANCTUM_TOKEN_EXPIRATION', 10080),
 
     /*
     |--------------------------------------------------------------------------

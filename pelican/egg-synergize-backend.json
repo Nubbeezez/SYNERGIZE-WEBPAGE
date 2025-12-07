@@ -14,7 +14,7 @@
         "PHP 8.2": "ghcr.io/parkervcp/yolks:php_8.2"
     },
     "file_denylist": [],
-    "startup": "cd /home/container/backend && php artisan serve --host=0.0.0.0 --port=${PORT}",
+    "startup": "cd /home/container && git pull && cd backend && php composer.phar install --no-dev --optimize-autoloader && php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=${PORT}",
     "config": {
         "files": "{}",
         "startup": "{\"done\": \"Server running on|Application starting\"}",

@@ -2,7 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useAuth } from '@/lib/auth'
+import {
+  useAuth,
+  isAdmin as checkIsAdmin,
+  isManager as checkIsManager,
+  isOwner as checkIsOwner,
+  getHighestRole,
+  formatRoleName,
+  getRoleColor,
+} from '@/lib/auth'
 import {
   DashboardIcon,
   UsersIcon,
@@ -13,22 +21,37 @@ import {
   SettingsIcon,
 } from '@/components/icons'
 
-const adminNavItems = [
-  { href: '/admin', icon: DashboardIcon, label: 'Dashboard' },
-  { href: '/admin/users', icon: UsersIcon, label: 'Users' },
-  { href: '/admin/bans', icon: ShieldIcon, label: 'Bans' },
-  { href: '/admin/servers', icon: ServerIcon, label: 'Servers' },
-  { href: '/admin/shop', icon: ShoppingBagIcon, label: 'Shop Items' },
-  { href: '/admin/logs', icon: DocumentIcon, label: 'Audit Logs' },
-  { href: '/admin/settings', icon: SettingsIcon, label: 'Settings' },
+// Nav items with permission requirements
+// minRole: minimum permission level required
+// 'admin' = 10, 'manager' = 30, 'owner' = 100
+type NavItem = {
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  minRole: 'admin' | 'manager' | 'owner'
+  badge?: string
+}
+
+const adminNavItems: NavItem[] = [
+  { href: '/admin', icon: DashboardIcon, label: 'Dashboard', minRole: 'admin' },
+  { href: '/admin/users', icon: UsersIcon, label: 'Users', minRole: 'manager', badge: 'Manager+' },
+  { href: '/admin/bans', icon: ShieldIcon, label: 'Bans', minRole: 'admin' },
+  { href: '/admin/servers', icon: ServerIcon, label: 'Servers', minRole: 'owner', badge: 'Owner' },
+  { href: '/admin/shop', icon: ShoppingBagIcon, label: 'Shop Items', minRole: 'admin' },
+  { href: '/admin/logs', icon: DocumentIcon, label: 'Audit Logs', minRole: 'admin' },
+  { href: '/admin/settings', icon: SettingsIcon, label: 'Settings', minRole: 'owner', badge: 'Owner' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { user, isAuthenticated, isLoading } = useAuth()
+  const { user, isLoading } = useAuth()
 
-  // Check if user has admin access
-  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
+  // Check permissions using the new role system
+  const isAuthenticated = !!user
+  const userIsAdmin = checkIsAdmin(user)
+  const userIsManager = checkIsManager(user)
+  const userIsOwner = checkIsOwner(user)
+  const highestRole = getHighestRole(user)
 
   if (isLoading) {
     return (
@@ -53,7 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     )
   }
 
-  if (!isAdmin) {
+  if (!userIsAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="card text-center max-w-md">
@@ -68,38 +91,60 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     )
   }
 
+  // Filter nav items based on user's role
+  const canAccessItem = (item: NavItem): boolean => {
+    switch (item.minRole) {
+      case 'owner': return userIsOwner
+      case 'manager': return userIsManager
+      case 'admin': return userIsAdmin
+      default: return false
+    }
+  }
+
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
       <aside className="w-64 bg-primary-light border-r border-primary flex-shrink-0">
         <div className="p-6 border-b border-primary">
           <h2 className="text-h4 gradient-text">Admin Panel</h2>
-          <p className="text-tiny text-muted mt-1">Welcome, {user?.username}</p>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-tiny text-muted">{user?.username}</span>
+            <span className={`text-tiny px-1.5 py-0.5 rounded border ${getRoleColor(highestRole)}`}>
+              {formatRoleName(highestRole)}
+            </span>
+          </div>
         </div>
 
         <nav className="p-4">
           <ul className="space-y-1">
-            {adminNavItems.map((item) => {
-              const isActive = pathname === item.href ||
-                (item.href !== '/admin' && pathname.startsWith(item.href))
-              const Icon = item.icon
+            {adminNavItems
+              .filter(canAccessItem)
+              .map((item) => {
+                const isActive = pathname === item.href ||
+                  (item.href !== '/admin' && pathname.startsWith(item.href))
+                const Icon = item.icon
 
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                      isActive
-                        ? 'bg-accent-pink/20 text-accent-pink'
-                        : 'text-muted hover:text-white hover:bg-primary'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                </li>
-              )
-            })}
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        isActive
+                          ? 'bg-accent-pink/20 text-accent-pink'
+                          : 'text-muted hover:text-white hover:bg-primary'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span>{item.label}</span>
+                      {item.badge && (
+                        <span className="ml-auto text-tiny bg-primary text-muted px-1.5 py-0.5 rounded">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                )
+              })}
           </ul>
         </nav>
 

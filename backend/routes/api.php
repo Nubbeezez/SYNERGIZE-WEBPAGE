@@ -8,9 +8,12 @@ use App\Http\Controllers\Api\V1\LeaderboardController;
 use App\Http\Controllers\Api\V1\BanController;
 use App\Http\Controllers\Api\V1\ShopController;
 use App\Http\Controllers\Api\V1\Admin\AdminBanController;
-use App\Http\Controllers\Api\V1\Admin\AdminRoleController;
+use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\AdminLogController;
 use App\Http\Controllers\Api\V1\Admin\AdminServerController;
+use App\Http\Controllers\Api\V1\Admin\AdminShopController;
+use App\Http\Controllers\Api\V1\Admin\AdminSettingsController;
+use App\Http\Controllers\Api\V1\SettingsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,15 +24,15 @@ use App\Http\Controllers\Api\V1\Admin\AdminServerController;
 |
 */
 
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->middleware('throttle:api')->group(function () {
     /*
     |--------------------------------------------------------------------------
     | Public Routes
     |--------------------------------------------------------------------------
     */
 
-    // Authentication
-    Route::prefix('auth')->group(function () {
+    // Authentication (stricter rate limiting)
+    Route::prefix('auth')->middleware('throttle:auth')->group(function () {
         Route::get('steam/init', [AuthController::class, 'steamInit']);
         Route::get('steam/callback', [AuthController::class, 'steamCallback']);
         Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
@@ -50,6 +53,9 @@ Route::prefix('v1')->group(function () {
     // Shop
     Route::get('shop/items', [ShopController::class, 'index']);
 
+    // Public settings (for frontend)
+    Route::get('settings', [SettingsController::class, 'public']);
+
     /*
     |--------------------------------------------------------------------------
     | Authenticated Routes
@@ -61,8 +67,9 @@ Route::prefix('v1')->group(function () {
         Route::get('users/me', [UserController::class, 'me']);
         Route::put('users/me', [UserController::class, 'update']);
 
-        // Shop (purchase)
-        Route::post('shop/purchase', [ShopController::class, 'purchase']);
+        // Shop (purchase - stricter rate limiting)
+        Route::post('shop/purchase', [ShopController::class, 'purchase'])
+            ->middleware('throttle:purchases');
     });
 
     /*
@@ -71,22 +78,48 @@ Route::prefix('v1')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
-        // Ban management
+    Route::prefix('admin')->middleware(['auth:sanctum', 'admin', 'throttle:admin'])->group(function () {
+        // Ban management (sensitive operations have stricter limits)
         Route::get('bans', [AdminBanController::class, 'index']);
-        Route::post('bans', [AdminBanController::class, 'store']);
-        Route::delete('bans/{ban}', [AdminBanController::class, 'destroy']);
+        Route::post('bans', [AdminBanController::class, 'store'])->middleware('throttle:sensitive');
+        Route::delete('bans/{ban}', [AdminBanController::class, 'destroy'])->middleware('throttle:sensitive');
 
-        // Role management (superadmin only)
-        Route::post('assign-role', [AdminRoleController::class, 'assign'])->middleware('superadmin');
-        Route::delete('roles/{assignment}', [AdminRoleController::class, 'revoke'])->middleware('superadmin');
+        // User/Role management (manager or owner only)
+        Route::prefix('users')->middleware('manager')->group(function () {
+            Route::get('/', [AdminUserController::class, 'index']);
+            Route::get('/{user}', [AdminUserController::class, 'show']);
+            Route::put('/{user}/roles', [AdminUserController::class, 'updateRoles'])->middleware('throttle:sensitive');
+            // Search has stricter rate limiting to prevent enumeration
+            Route::get('/search/{query}', [AdminUserController::class, 'search'])->middleware('throttle:sensitive');
+        });
 
-        // Server management
-        Route::get('servers', [AdminServerController::class, 'index']);
-        Route::put('servers/{server}', [AdminServerController::class, 'update']);
+        // Server management (owner only)
+        Route::prefix('servers')->group(function () {
+            Route::get('/', [AdminServerController::class, 'index']);
+            Route::post('/', [AdminServerController::class, 'store'])->middleware(['owner', 'throttle:sensitive']);
+            Route::put('/{server}', [AdminServerController::class, 'update'])->middleware(['owner', 'throttle:sensitive']);
+            Route::delete('/{server}', [AdminServerController::class, 'destroy'])->middleware(['owner', 'throttle:sensitive']);
+        });
+
+        // Shop management (admin can view, owner can modify)
+        Route::prefix('shop')->group(function () {
+            Route::get('/', [AdminShopController::class, 'index']);
+            Route::get('/{item}', [AdminShopController::class, 'show']);
+            Route::post('/', [AdminShopController::class, 'store'])->middleware(['owner', 'throttle:sensitive']);
+            Route::put('/{item}', [AdminShopController::class, 'update'])->middleware(['owner', 'throttle:sensitive']);
+            Route::delete('/{item}', [AdminShopController::class, 'destroy'])->middleware(['owner', 'throttle:sensitive']);
+            Route::post('/{item}/toggle', [AdminShopController::class, 'toggleAvailability'])->middleware('owner');
+        });
 
         // Audit logs
         Route::get('logs', [AdminLogController::class, 'index']);
+
+        // Site settings (owner only)
+        Route::prefix('settings')->middleware('owner')->group(function () {
+            Route::get('/', [AdminSettingsController::class, 'index']);
+            Route::put('/', [AdminSettingsController::class, 'update'])->middleware('throttle:sensitive');
+            Route::put('/batch', [AdminSettingsController::class, 'updateBatch'])->middleware('throttle:sensitive');
+        });
     });
 
     /*

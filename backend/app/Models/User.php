@@ -100,6 +100,34 @@ class User extends Authenticatable
     }
 
     /**
+     * Role hierarchy (higher number = more permissions)
+     * user: normal user (no login required for basic site access)
+     * vip: bought VIP perks
+     * admin: granted through application
+     * senior-admin: admin after 1 year (same permissions, honorary title)
+     * head-admin: leads a team of ~5 admins
+     * manager: almost full access, just under owner
+     * owner: full access to everything
+     */
+    public const ROLE_HIERARCHY = [
+        'user' => 0,
+        'vip' => 1,
+        'admin' => 10,
+        'senior-admin' => 10,  // Same permissions as admin
+        'head-admin' => 20,
+        'manager' => 30,
+        'owner' => 100,
+    ];
+
+    /**
+     * Get all valid roles.
+     */
+    public static function getValidRoles(): array
+    {
+        return array_keys(self::ROLE_HIERARCHY);
+    }
+
+    /**
      * Check if user has a specific role.
      */
     public function hasRole(string $role): bool
@@ -108,19 +136,105 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user is an admin (admin or superadmin).
+     * Get user's highest role.
      */
-    public function isAdmin(): bool
+    public function getHighestRole(): string
     {
-        return $this->hasRole('admin') || $this->hasRole('superadmin');
+        $roles = $this->roles ?? ['user'];
+        $highest = 'user';
+        $highestLevel = 0;
+
+        foreach ($roles as $role) {
+            $level = self::ROLE_HIERARCHY[$role] ?? 0;
+            if ($level > $highestLevel) {
+                $highestLevel = $level;
+                $highest = $role;
+            }
+        }
+
+        return $highest;
     }
 
     /**
-     * Check if user is a superadmin.
+     * Get user's permission level (highest role level).
      */
-    public function isSuperAdmin(): bool
+    public function getPermissionLevel(): int
     {
-        return $this->hasRole('superadmin');
+        $roles = $this->roles ?? ['user'];
+        $highest = 0;
+
+        foreach ($roles as $role) {
+            $level = self::ROLE_HIERARCHY[$role] ?? 0;
+            if ($level > $highest) {
+                $highest = $level;
+            }
+        }
+
+        return $highest;
+    }
+
+    /**
+     * Check if user has at least the given permission level.
+     */
+    public function hasPermissionLevel(int $level): bool
+    {
+        return $this->getPermissionLevel() >= $level;
+    }
+
+    /**
+     * Check if user can access admin panel (admin or higher).
+     */
+    public function isAdmin(): bool
+    {
+        return $this->getPermissionLevel() >= self::ROLE_HIERARCHY['admin'];
+    }
+
+    /**
+     * Check if user is head-admin or higher.
+     */
+    public function isHeadAdmin(): bool
+    {
+        return $this->getPermissionLevel() >= self::ROLE_HIERARCHY['head-admin'];
+    }
+
+    /**
+     * Check if user is manager or higher.
+     */
+    public function isManager(): bool
+    {
+        return $this->getPermissionLevel() >= self::ROLE_HIERARCHY['manager'];
+    }
+
+    /**
+     * Check if user is the owner.
+     */
+    public function isOwner(): bool
+    {
+        return $this->hasRole('owner');
+    }
+
+    /**
+     * Check if user can manage roles (owner or manager only).
+     */
+    public function canManageRoles(): bool
+    {
+        return $this->isManager();
+    }
+
+    /**
+     * Check if user can manage servers (owner only).
+     */
+    public function canManageServers(): bool
+    {
+        return $this->isOwner();
+    }
+
+    /**
+     * Check if user can manage settings (owner only).
+     */
+    public function canManageSettings(): bool
+    {
+        return $this->isOwner();
     }
 
     /**

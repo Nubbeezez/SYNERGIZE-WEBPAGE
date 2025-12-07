@@ -1,25 +1,41 @@
+'use client'
+
 import Link from 'next/link'
+import Image from 'next/image'
+import { useState, useEffect } from 'react'
 import { SteamIcon, DiscordIcon } from './icons'
+import { settingsApi, SiteSettings } from '@/lib/api'
 
 export function Footer() {
+  const [settings, setSettings] = useState<SiteSettings | null>(null)
+
+  useEffect(() => {
+    settingsApi.getPublic()
+      .then((res) => setSettings(res.data))
+      .catch(() => {})
+  }, [])
+
   return (
     <footer className="bg-primary-light/50 border-t border-white/5">
       <div className="container-custom py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="md:col-span-1">
-            <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-accent flex items-center justify-center">
-                <span className="text-white font-bold text-lg">S</span>
-              </div>
-              <span className="text-h4 font-bold">Synergize</span>
+            <Link href="/" className="flex items-center mb-4">
+              <Image
+                src="/logo.png"
+                alt={settings?.site_name || 'Synergize'}
+                width={130}
+                height={44}
+                className="h-11 w-auto"
+              />
             </Link>
             <p className="text-muted text-small mb-4">
-              The ultimate CS2 community platform for competitive gaming.
+              {settings?.site_description || 'The ultimate CS2 community platform for competitive gaming.'}
             </p>
             <div className="flex gap-4">
               <a
-                href="#"
+                href={settings?.discord_invite || '#'}
                 className="text-muted hover:text-accent-cyan transition-colors"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -27,7 +43,7 @@ export function Footer() {
                 <DiscordIcon className="w-5 h-5" />
               </a>
               <a
-                href="#"
+                href={settings?.steam_group_url || '#'}
                 className="text-muted hover:text-white transition-colors"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -83,12 +99,12 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="#" className="text-muted hover:text-white transition-colors text-small">
+                <a href={settings?.discord_invite || '#'} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-white transition-colors text-small">
                   Discord
                 </a>
               </li>
               <li>
-                <a href="#" className="text-muted hover:text-white transition-colors text-small">
+                <a href={settings?.steam_group_url || '#'} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-white transition-colors text-small">
                   Steam Group
                 </a>
               </li>
@@ -122,7 +138,7 @@ export function Footer() {
 
         <div className="border-t border-white/5 mt-8 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-muted text-small">
-            &copy; {new Date().getFullYear()} Synergize. All rights reserved.
+            &copy; {new Date().getFullYear()} {settings?.site_name || 'Synergize'}. All rights reserved.
           </p>
           <p className="text-muted text-tiny">
             Not affiliated with Valve Corporation.

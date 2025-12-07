@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useState } from 'react'
-import { useAuth } from '@/lib/auth'
+import { useState, useEffect } from 'react'
+import { useAuth, isAdmin } from '@/lib/auth'
+import { settingsApi, SiteSettings } from '@/lib/api'
 import {
   ServerIcon,
   TrophyIcon,
@@ -25,17 +26,24 @@ const navItems = [
   { name: 'Shop', href: '/shop', icon: ShoppingBagIcon },
 ]
 
-const communityItems = [
-  { name: 'Discord', href: '#', external: true },
-  { name: 'Rules', href: '/rules' },
-  { name: 'Support', href: '/support' },
-]
-
 export function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [communityDropdownOpen, setCommunityDropdownOpen] = useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
+  const [settings, setSettings] = useState<SiteSettings | null>(null)
   const { user, isLoading, logout } = useAuth()
+
+  useEffect(() => {
+    settingsApi.getPublic()
+      .then((res) => setSettings(res.data))
+      .catch(() => {})
+  }, [])
+
+  const communityItems = [
+    { name: 'Discord', href: settings?.discord_invite || '#', external: true },
+    { name: 'Rules', href: '/rules' },
+    { name: 'Support', href: '/support' },
+  ]
 
   return (
     <header className="sticky top-0 z-50 bg-primary/95 backdrop-blur-sm border-b border-white/5">
@@ -46,9 +54,9 @@ export function Navigation() {
             <Image
               src="/logo.png"
               alt="Synergize"
-              width={140}
-              height={40}
-              className="h-10 w-auto"
+              width={152}
+              height={52}
+              className="h-[52px] w-auto"
               priority
             />
           </Link>
@@ -130,7 +138,7 @@ export function Navigation() {
                       <UserIcon className="w-4 h-4" />
                       Profile
                     </Link>
-                    {user.roles?.includes('admin') && (
+                    {isAdmin(user) && (
                       <Link href="/admin" className="dropdown-item flex items-center gap-2">
                         <CogIcon className="w-4 h-4" />
                         Admin Panel
@@ -199,7 +207,7 @@ export function Navigation() {
                   <Link href="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
                     Profile
                   </Link>
-                  {user.roles?.includes('admin') && (
+                  {isAdmin(user) && (
                     <Link href="/admin" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
                       Admin Panel
                     </Link>

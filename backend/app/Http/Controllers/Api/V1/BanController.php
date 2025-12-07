@@ -16,6 +16,13 @@ class BanController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $request->validate([
+            'search' => 'nullable|string|max:100',
+            'steam_id' => 'nullable|string|max:32',
+            'scope' => 'nullable|string|in:global,server',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
         $query = Ban::with('server');
 
         // Filter by Steam ID
@@ -23,11 +30,11 @@ class BanController extends Controller
             $query->where('steam_id', $request->input('steam_id'));
         }
 
-        // Search by reason or username
-        if ($request->has('search')) {
-            $search = $request->input('search');
+        // Search by reason or username (escape LIKE wildcards to prevent pattern injection)
+        if ($request->filled('search')) {
+            $search = str_replace(['%', '_'], ['\%', '\_'], $request->input('search'));
             $query->where(function ($q) use ($search) {
-                $q->where('reason', 'ilike', "%{$search}%")
+                $q->where('reason', 'like', "%{$search}%")
                     ->orWhere('steam_id', 'like', "%{$search}%");
             });
         }

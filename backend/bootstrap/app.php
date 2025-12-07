@@ -11,6 +11,17 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->statefulApi();
+
+        // Apply security headers to all API responses
+        $middleware->api(append: [
+            \App\Http\Middleware\SecurityHeadersMiddleware::class,
+        ]);
+
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'manager' => \App\Http\Middleware\ManagerMiddleware::class,
+            'owner' => \App\Http\Middleware\OwnerMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

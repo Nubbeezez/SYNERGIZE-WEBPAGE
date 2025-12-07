@@ -14,22 +14,31 @@ class ServerController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $request->validate([
+            'search' => 'nullable|string|max:100',
+            'status' => 'nullable|string|in:online,offline',
+            'region' => 'nullable|string|max:10',
+            'sort' => 'nullable|string|in:name,players,created_at,region',
+            'order' => 'nullable|string|in:asc,desc',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
         $query = Server::query();
 
         // Filter by status
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
         }
 
         // Filter by region
-        if ($request->has('region')) {
+        if ($request->filled('region')) {
             $query->where('region', $request->input('region'));
         }
 
-        // Search by name
-        if ($request->has('search')) {
-            $search = $request->input('search');
-            $query->where('name', 'ilike', "%{$search}%");
+        // Search by name (escape LIKE wildcards to prevent pattern injection)
+        if ($request->filled('search')) {
+            $search = str_replace(['%', '_'], ['\%', '\_'], $request->input('search'));
+            $query->where('name', 'like', "%{$search}%");
         }
 
         // Sorting

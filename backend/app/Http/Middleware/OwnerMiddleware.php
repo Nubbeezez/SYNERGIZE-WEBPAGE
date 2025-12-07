@@ -6,20 +6,28 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class SuperAdminMiddleware
+class OwnerMiddleware
 {
     /**
      * Handle an incoming request.
+     * Only allows users with the 'owner' role.
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        if (!$request->user()) {
+            return response()->json([
+                'error' => [
+                    'code' => 'UNAUTHENTICATED',
+                    'message' => 'You must be logged in.',
+                ],
+            ], 401);
+        }
 
-        if (!$user || !$user->isSuperAdmin()) {
+        if (!$request->user()->isOwner()) {
             return response()->json([
                 'error' => [
                     'code' => 'FORBIDDEN',
-                    'message' => 'Only superadmins can perform this action.',
+                    'message' => 'Only the owner can access this resource.',
                 ],
             ], 403);
         }

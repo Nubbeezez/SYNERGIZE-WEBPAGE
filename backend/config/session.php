@@ -26,9 +26,10 @@ return [
     |--------------------------------------------------------------------------
     | Session Encryption
     |--------------------------------------------------------------------------
+    | Sessions should be encrypted to protect sensitive data.
     */
 
-    'encrypt' => env('SESSION_ENCRYPT', false),
+    'encrypt' => env('SESSION_ENCRYPT', true),
 
     /*
     |--------------------------------------------------------------------------
@@ -101,9 +102,10 @@ return [
     |--------------------------------------------------------------------------
     | HTTPS Only Cookies
     |--------------------------------------------------------------------------
+    | Default to true in production for security.
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    'secure' => env('SESSION_SECURE_COOKIE', true),
 
     /*
     |--------------------------------------------------------------------------
@@ -117,9 +119,11 @@ return [
     |--------------------------------------------------------------------------
     | Same-Site Cookies
     |--------------------------------------------------------------------------
+    | Use 'strict' for better CSRF protection in same-origin scenarios.
+    | Use 'lax' if cross-site navigation with sessions is needed.
     */
 
-    'same_site' => env('SESSION_SAME_SITE', 'lax'),
+    'same_site' => env('SESSION_SAME_SITE', 'strict'),
 
     /*
     |--------------------------------------------------------------------------

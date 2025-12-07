@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreBanRequest;
 use App\Models\Ban;
 use App\Models\User;
 use App\Models\AuditLog;
 use App\Services\SteamAuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AdminBanController extends Controller
 {
@@ -92,26 +94,9 @@ class AdminBanController extends Controller
     /**
      * Create a new ban.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreBanRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'steam_id' => 'required|string|size:17',
-            'reason' => 'required|string|max:500',
-            'scope' => 'required|in:global,server',
-            'server_id' => 'required_if:scope,server|nullable|exists:servers,id',
-            'expires_at' => 'nullable|date|after:now',
-        ]);
-
-        // Validate Steam ID format
-        if (!SteamAuthService::isValidSteamId($validated['steam_id'])) {
-            return response()->json([
-                'error' => [
-                    'code' => 'INVALID_STEAM_ID',
-                    'message' => 'Invalid Steam ID format',
-                ],
-            ], 400);
-        }
-
+        $validated = $request->validated();
         $actor = $request->user();
 
         // Check if already banned with same scope
@@ -132,38 +117,52 @@ class AdminBanController extends Controller
             ], 400);
         }
 
-        // Create ban
-        $ban = Ban::create([
-            'steam_id' => $validated['steam_id'],
-            'actor_steam_id' => $actor->steam_id,
-            'reason' => $validated['reason'],
-            'scope' => $validated['scope'],
-            'server_id' => $validated['server_id'] ?? null,
-            'expires_at' => $validated['expires_at'] ?? null,
-            'is_active' => true,
-        ]);
+        // Create ban atomically with user status update
+        try {
+            $ban = DB::transaction(function () use ($validated, $actor) {
+                // Create ban
+                $ban = Ban::create([
+                    'steam_id' => $validated['steam_id'],
+                    'actor_steam_id' => $actor->steam_id,
+                    'reason' => $validated['reason'],
+                    'scope' => $validated['scope'],
+                    'server_id' => $validated['server_id'] ?? null,
+                    'expires_at' => $validated['expires_at'] ?? null,
+                    'is_active' => true,
+                ]);
 
-        // Update user ban status if global ban
-        if ($validated['scope'] === 'global') {
-            User::where('steam_id', $validated['steam_id'])->update([
-                'is_banned' => true,
-                'banned_until' => $validated['expires_at'] ?? null,
-            ]);
+                // Update user ban status if global ban (atomic with ban creation)
+                if ($validated['scope'] === 'global') {
+                    User::where('steam_id', $validated['steam_id'])->update([
+                        'is_banned' => true,
+                        'banned_until' => $validated['expires_at'] ?? null,
+                    ]);
+                }
+
+                // Log the action
+                AuditLog::log(
+                    $actor->steam_id,
+                    'ban.create',
+                    'ban',
+                    $ban->id,
+                    [
+                        'target_steam_id' => $validated['steam_id'],
+                        'reason' => $validated['reason'],
+                        'scope' => $validated['scope'],
+                        'expires_at' => $validated['expires_at'] ?? null,
+                    ]
+                );
+
+                return $ban;
+            });
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'BAN_FAILED',
+                    'message' => 'Failed to create ban. Please try again.',
+                ],
+            ], 500);
         }
-
-        // Log the action
-        AuditLog::log(
-            $actor->steam_id,
-            'ban.create',
-            'ban',
-            $ban->id,
-            [
-                'target_steam_id' => $validated['steam_id'],
-                'reason' => $validated['reason'],
-                'scope' => $validated['scope'],
-                'expires_at' => $validated['expires_at'] ?? null,
-            ]
-        );
 
         return response()->json([
             'data' => [

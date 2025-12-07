@@ -170,9 +170,15 @@ export interface ShopItem {
   name: string
   description: string
   price: number
-  type: 'perk' | 'skin' | 'role' | 'other'
+  type: 'vip' | 'perk' | 'skin' | 'role' | 'other'
   available: boolean
-  metadata: Record<string, unknown>
+  stock: number | null
+  metadata: {
+    duration_days?: number
+    [key: string]: unknown
+  }
+  created_at?: string
+  updated_at?: string
 }
 
 export interface AuditLog {
@@ -216,20 +222,87 @@ export const shopApi = {
     api.post<{ data: { message: string; item: ShopItem; new_balance: number } }>('/shop/purchase', { item_id: itemId }),
 }
 
+export interface SiteSettings {
+  discord_invite: string
+  steam_group_url: string
+  site_name: string
+  site_description: string
+}
+
+export interface SettingItem {
+  key: string
+  value: string | boolean | number | object
+  type: string
+  updated_at: string
+}
+
+export const settingsApi = {
+  getPublic: () => api.get<{ data: SiteSettings }>('/settings'),
+}
+
+export interface AdminUser {
+  id: number
+  steam_id: string
+  username: string
+  avatar_url: string | null
+  roles: string[]
+  credits: number
+  is_banned: boolean
+  banned_until: string | null
+  created_at: string
+  highest_role?: string
+  permission_level?: number
+}
+
 export const adminApi = {
+  // Users (manager+ only)
+  getUsers: (params?: { role?: string; search?: string; page?: number; per_page?: number }) =>
+    api.get<PaginatedResponse<AdminUser>>('/admin/users', params),
+  getUser: (id: number) =>
+    api.get<{ data: AdminUser }>(`/admin/users/${id}`),
+  searchUsers: (query: string) =>
+    api.get<{ data: AdminUser[] }>(`/admin/users/search/${encodeURIComponent(query)}`),
+  updateUserRoles: (userId: number, roles: string[]) =>
+    api.put<{ message: string; data: AdminUser }>(`/admin/users/${userId}/roles`, { roles }),
+
   // Bans
   createBan: (data: { steam_id: string; reason: string; scope: string; server_id?: number; expires_at?: string }) =>
     api.post<{ data: Ban }>('/admin/bans', data),
   removeBan: (id: number, reason?: string) =>
     api.delete<{ data: { message: string } }>(`/admin/bans/${id}`),
 
-  // Roles
-  assignRole: (data: { steam_id: string; role: string; scope: string; server_id?: number; expires_at?: string }) =>
-    api.post<{ data: { message: string } }>('/admin/assign-role', data),
-  removeRole: (assignmentId: number) =>
-    api.delete<{ data: { message: string } }>(`/admin/roles/${assignmentId}`),
+  // Servers (owner only)
+  getServers: (params?: { status?: string; page?: number }) =>
+    api.get<PaginatedResponse<Server>>('/admin/servers', params),
+  createServer: (data: { name: string; ip: string; port: number; region: string; max_players: number; tags?: string[]; rcon_password?: string }) =>
+    api.post<{ message: string; data: Server }>('/admin/servers', data),
+  updateServer: (id: number, data: Partial<{ name: string; ip: string; port: number; region: string; max_players: number; tags: string[]; rcon_password: string }>) =>
+    api.put<{ message: string; data: Server }>(`/admin/servers/${id}`, data),
+  deleteServer: (id: number) =>
+    api.delete<{ message: string }>(`/admin/servers/${id}`),
+
+  // Shop (admin can view, owner can modify)
+  getShopItems: (params?: { type?: string; available?: boolean; page?: number }) =>
+    api.get<PaginatedResponse<ShopItem>>('/admin/shop', params),
+  getShopItem: (id: number) =>
+    api.get<{ data: ShopItem }>(`/admin/shop/${id}`),
+  createShopItem: (data: { name: string; description: string; price: number; type: string; available?: boolean; stock?: number | null; duration_days?: number | null }) =>
+    api.post<{ message: string; data: ShopItem }>('/admin/shop', data),
+  updateShopItem: (id: number, data: Partial<{ name: string; description: string; price: number; type: string; available: boolean; stock: number | null; duration_days: number | null }>) =>
+    api.put<{ message: string; data: ShopItem }>(`/admin/shop/${id}`, data),
+  deleteShopItem: (id: number) =>
+    api.delete<{ message: string }>(`/admin/shop/${id}`),
+  toggleShopItem: (id: number) =>
+    api.post<{ message: string; data: ShopItem }>(`/admin/shop/${id}/toggle`),
 
   // Logs
   getLogs: (params?: { actor_steam_id?: string; action?: string; from?: string; to?: string; page?: number }) =>
     api.get<PaginatedResponse<AuditLog>>('/admin/logs', params),
+
+  // Settings (owner only)
+  getSettings: () => api.get<{ data: SettingItem[] }>('/admin/settings'),
+  updateSetting: (key: string, value: string | boolean | number) =>
+    api.put<{ message: string; data: { key: string; value: unknown } }>('/admin/settings', { key, value }),
+  updateSettingsBatch: (settings: Array<{ key: string; value: string | boolean | number }>) =>
+    api.put<{ message: string; updated: string[] }>('/admin/settings/batch', { settings }),
 }

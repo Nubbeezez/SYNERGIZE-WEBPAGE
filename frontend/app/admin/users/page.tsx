@@ -1,43 +1,45 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, adminApi, type PaginatedResponse } from '@/lib/api'
-import { UsersIcon, MagnifyingGlassIcon, ShieldIcon, CreditIcon } from '@/components/icons'
-
-interface User {
-  id: number
-  steam_id: string
-  username: string
-  avatar_url: string | null
-  role: string
-  credits: number
-  is_banned: boolean
-  last_seen: string
-  created_at: string
-}
+import { adminApi, type AdminUser } from '@/lib/api'
+import {
+  useAuth,
+  isOwner as checkIsOwner,
+  VALID_ROLES,
+  formatRoleName,
+  getRoleColor,
+  ROLE_HIERARCHY,
+} from '@/lib/auth'
+import { UsersIcon, MagnifyingGlassIcon, ShieldIcon, CheckIcon, XMarkIcon } from '@/components/icons'
 
 export default function AdminUsersPage() {
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [page, setPage] = useState(1)
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
+  const { user: currentUser } = useAuth()
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-users', { search, role: roleFilter }],
-    queryFn: () => api.get<PaginatedResponse<User>>('/admin/users', {
+    queryKey: ['admin-users', { search, role: roleFilter, page }],
+    queryFn: () => adminApi.getUsers({
       search: search || undefined,
       role: roleFilter || undefined,
+      page,
+      per_page: 20,
     }),
   })
 
   const users = data?.data || []
+  const meta = data?.meta
 
   return (
     <div>
       <div className="mb-8">
         <h1 className="text-h1 mb-2">User Management</h1>
-        <p className="text-muted">View and manage registered users.</p>
+        <p className="text-muted">Search users and manage their roles.</p>
       </div>
 
       {/* Filters */}
@@ -48,21 +50,27 @@ export default function AdminUsersPage() {
             type="text"
             placeholder="Search by Steam ID or username..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
             className="input pl-10"
           />
         </div>
         <select
           value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
+          onChange={(e) => {
+            setRoleFilter(e.target.value)
+            setPage(1)
+          }}
           className="input w-full md:w-48"
         >
           <option value="">All Roles</option>
-          <option value="user">User</option>
-          <option value="vip">VIP</option>
-          <option value="moderator">Moderator</option>
-          <option value="admin">Admin</option>
-          <option value="superadmin">Super Admin</option>
+          {VALID_ROLES.map((role) => (
+            <option key={role} value={role}>
+              {formatRoleName(role)}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -74,10 +82,10 @@ export default function AdminUsersPage() {
               <tr className="border-b border-primary">
                 <th className="px-4 py-3 text-left text-muted text-small font-medium">User</th>
                 <th className="px-4 py-3 text-left text-muted text-small font-medium">Steam ID</th>
-                <th className="px-4 py-3 text-left text-muted text-small font-medium">Role</th>
+                <th className="px-4 py-3 text-left text-muted text-small font-medium">Roles</th>
                 <th className="px-4 py-3 text-right text-muted text-small font-medium">Credits</th>
                 <th className="px-4 py-3 text-left text-muted text-small font-medium">Status</th>
-                <th className="px-4 py-3 text-left text-muted text-small font-medium">Last Seen</th>
+                <th className="px-4 py-3 text-left text-muted text-small font-medium">Joined</th>
                 <th className="px-4 py-3 text-right text-muted text-small font-medium">Actions</th>
               </tr>
             </thead>
@@ -102,10 +110,12 @@ export default function AdminUsersPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {user.avatar_url ? (
-                          <img
+                          <Image
                             src={user.avatar_url}
                             alt={user.username}
-                            className="w-8 h-8 rounded-full"
+                            width={32}
+                            height={32}
+                            className="rounded-full"
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-muted">
@@ -119,10 +129,24 @@ export default function AdminUsersPage() {
                       <span className="text-small font-mono text-muted">{user.steam_id}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <RoleBadge role={user.role} />
+                      <div className="flex flex-wrap gap-1">
+                        {user.roles?.filter(r => r !== 'user').map((role) => (
+                          <span
+                            key={role}
+                            className={`px-2 py-0.5 rounded text-tiny font-medium border ${getRoleColor(role)}`}
+                          >
+                            {formatRoleName(role)}
+                          </span>
+                        ))}
+                        {(!user.roles || user.roles.length === 0 || (user.roles.length === 1 && user.roles[0] === 'user')) && (
+                          <span className="px-2 py-0.5 rounded text-tiny font-medium bg-gray-500/20 text-gray-400">
+                            User
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-highlight">{user.credits.toLocaleString()}</span>
+                      <span className="text-highlight">{user.credits?.toLocaleString() || 0}</span>
                     </td>
                     <td className="px-4 py-3">
                       {user.is_banned ? (
@@ -137,7 +161,7 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-small text-muted">
-                        {new Date(user.last_seen).toLocaleDateString()}
+                        {new Date(user.created_at).toLocaleDateString()}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -157,112 +181,140 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Pagination */}
-      {data?.meta && data.meta.last_page > 1 && (
-        <div className="mt-6 text-center">
+      {meta && meta.last_page > 1 && (
+        <div className="mt-6 flex items-center justify-between">
           <p className="text-muted text-small">
-            Showing {users.length} of {data.meta.total} users
+            Showing {users.length} of {meta.total} users (Page {meta.page} of {meta.last_page})
           </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="btn-secondary text-small"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(p => Math.min(meta.last_page, p + 1))}
+              disabled={page >= meta.last_page}
+              className="btn-secondary text-small"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 
       {/* User Detail Modal */}
       {selectedUser && (
-        <UserDetailModal
+        <UserRoleModal
           user={selectedUser}
+          currentUser={currentUser}
           onClose={() => setSelectedUser(null)}
+          onUpdate={() => {
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+          }}
         />
       )}
     </div>
   )
 }
 
-function RoleBadge({ role }: { role: string }) {
-  const roleStyles: Record<string, string> = {
-    user: 'bg-primary text-muted',
-    vip: 'bg-highlight/20 text-highlight',
-    moderator: 'bg-accent-cyan/20 text-accent-cyan',
-    admin: 'bg-accent-pink/20 text-accent-pink',
-    superadmin: 'bg-error/20 text-error',
-  }
-
-  return (
-    <span className={`px-2 py-1 rounded text-tiny font-medium ${roleStyles[role] || roleStyles.user}`}>
-      {role.toUpperCase()}
-    </span>
-  )
-}
-
-function UserDetailModal({ user, onClose }: { user: User; onClose: () => void }) {
-  const [newRole, setNewRole] = useState(user.role)
-  const [creditsToAdd, setCreditsToAdd] = useState('')
+function UserRoleModal({
+  user,
+  currentUser,
+  onClose,
+  onUpdate,
+}: {
+  user: AdminUser
+  currentUser: ReturnType<typeof useAuth>['user']
+  onClose: () => void
+  onUpdate: () => void
+}) {
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(user.roles || ['user'])
   const [isUpdating, setIsUpdating] = useState(false)
-  const queryClient = useQueryClient()
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
-  const handleRoleChange = async () => {
-    if (newRole === user.role) return
+  const isCurrentUserOwner = checkIsOwner(currentUser)
 
+  // Determine which roles the current user can assign
+  const canAssignRole = (role: string): boolean => {
+    // Owner can assign any role
+    if (isCurrentUserOwner) return true
+
+    // Manager can assign roles below manager level
+    const roleLevel = ROLE_HIERARCHY[role] || 0
+    return roleLevel < ROLE_HIERARCHY['manager']
+  }
+
+  const handleToggleRole = (role: string) => {
+    if (!canAssignRole(role)) return
+
+    setSelectedRoles((prev) => {
+      if (prev.includes(role)) {
+        // Can't remove 'user' role
+        if (role === 'user') return prev
+        return prev.filter((r) => r !== role)
+      } else {
+        return [...prev, role]
+      }
+    })
+    setSuccess(false)
+    setError(null)
+  }
+
+  const handleSave = async () => {
     setIsUpdating(true)
+    setError(null)
+    setSuccess(false)
+
     try {
-      await adminApi.assignRole({
-        steam_id: user.steam_id,
-        role: newRole,
-        scope: 'global',
-      })
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
-      alert('Role updated successfully')
-    } catch (err) {
-      alert('Failed to update role')
+      await adminApi.updateUserRoles(user.id, selectedRoles)
+      setSuccess(true)
+      onUpdate()
+    } catch (err: unknown) {
+      const error = err as { message?: string }
+      setError(error.message || 'Failed to update roles')
     } finally {
       setIsUpdating(false)
     }
   }
 
-  const handleAddCredits = async () => {
-    const amount = parseInt(creditsToAdd)
-    if (!amount || isNaN(amount)) return
-
-    setIsUpdating(true)
-    try {
-      await api.post('/admin/users/credits', {
-        steam_id: user.steam_id,
-        amount,
-      })
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
-      setCreditsToAdd('')
-      alert('Credits added successfully')
-    } catch (err) {
-      alert('Failed to add credits')
-    } finally {
-      setIsUpdating(false)
-    }
-  }
+  const hasChanges = JSON.stringify(selectedRoles.sort()) !== JSON.stringify((user.roles || ['user']).sort())
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="card max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="card max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           {user.avatar_url ? (
-            <img src={user.avatar_url} alt={user.username} className="w-16 h-16 rounded-full" />
+            <Image
+              src={user.avatar_url}
+              alt={user.username}
+              width={64}
+              height={64}
+              className="rounded-full"
+            />
           ) : (
             <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-2xl text-muted">
               {user.username.charAt(0).toUpperCase()}
             </div>
           )}
-          <div>
+          <div className="flex-1">
             <h2 className="text-h3">{user.username}</h2>
             <p className="text-small text-muted font-mono">{user.steam_id}</p>
           </div>
+          <button onClick={onClose} className="p-2 hover:bg-primary rounded-lg transition-colors">
+            <XMarkIcon className="w-5 h-5" />
+          </button>
         </div>
 
         {/* User Info */}
-        <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-primary rounded-lg">
-          <div>
-            <p className="text-tiny text-muted">Role</p>
-            <RoleBadge role={user.role} />
-          </div>
+        <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-primary rounded-lg">
           <div>
             <p className="text-tiny text-muted">Credits</p>
-            <p className="text-highlight font-bold">{user.credits.toLocaleString()}</p>
+            <p className="text-highlight font-bold">{user.credits?.toLocaleString() || 0}</p>
           </div>
           <div>
             <p className="text-tiny text-muted">Status</p>
@@ -276,62 +328,94 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
           </div>
         </div>
 
-        {/* Change Role */}
+        {/* Role Selection */}
         <div className="mb-6">
           <h4 className="text-h4 mb-3 flex items-center gap-2">
             <ShieldIcon className="w-5 h-5 text-accent-pink" />
-            Change Role
+            Manage Roles
           </h4>
-          <div className="flex gap-2">
-            <select
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              className="input flex-1"
-            >
-              <option value="user">User</option>
-              <option value="vip">VIP</option>
-              <option value="moderator">Moderator</option>
-              <option value="admin">Admin</option>
-              <option value="superadmin">Super Admin</option>
-            </select>
-            <button
-              onClick={handleRoleChange}
-              disabled={isUpdating || newRole === user.role}
-              className="btn-primary"
-            >
-              Update
-            </button>
+          <p className="text-small text-muted mb-4">
+            Select the roles for this user. Changes are saved when you click &quot;Save Changes&quot;.
+          </p>
+
+          <div className="space-y-2">
+            {VALID_ROLES.filter(r => r !== 'user').map((role) => {
+              const isSelected = selectedRoles.includes(role)
+              const canAssign = canAssignRole(role)
+              const roleLevel = ROLE_HIERARCHY[role]
+
+              return (
+                <button
+                  key={role}
+                  onClick={() => handleToggleRole(role)}
+                  disabled={!canAssign}
+                  className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
+                    isSelected
+                      ? `${getRoleColor(role)} border-current`
+                      : canAssign
+                      ? 'border-primary hover:border-white/20 bg-primary/50'
+                      : 'border-primary/50 bg-primary/30 opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                        isSelected ? 'bg-current border-current' : 'border-muted'
+                      }`}
+                    >
+                      {isSelected && <CheckIcon className="w-3 h-3 text-primary" />}
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium">{formatRoleName(role)}</p>
+                      <p className="text-tiny text-muted">
+                        {role === 'vip' && 'Purchased VIP perks'}
+                        {role === 'admin' && 'Basic admin access'}
+                        {role === 'senior-admin' && 'Admin for 1+ year (honorary)'}
+                        {role === 'head-admin' && 'Leads a team of admins'}
+                        {role === 'manager' && 'Almost full access'}
+                        {role === 'owner' && 'Full access to everything'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-tiny text-muted">Level {roleLevel}</span>
+                </button>
+              )
+            })}
           </div>
+
+          {!isCurrentUserOwner && (
+            <p className="text-tiny text-muted mt-3">
+              Note: You can only assign roles below Manager level. Only the Owner can assign Manager or Owner roles.
+            </p>
+          )}
         </div>
 
-        {/* Add Credits */}
-        <div className="mb-6">
-          <h4 className="text-h4 mb-3 flex items-center gap-2">
-            <CreditIcon className="w-5 h-5 text-highlight" />
-            Add Credits
-          </h4>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              value={creditsToAdd}
-              onChange={(e) => setCreditsToAdd(e.target.value)}
-              placeholder="Amount"
-              className="input flex-1"
-            />
-            <button
-              onClick={handleAddCredits}
-              disabled={isUpdating || !creditsToAdd}
-              className="btn-primary"
-            >
-              Add
-            </button>
+        {/* Error/Success Messages */}
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-error/20 text-error text-small">
+            {error}
           </div>
-        </div>
+        )}
+        {success && (
+          <div className="mb-4 p-3 rounded-lg bg-accent-green/20 text-accent-green text-small flex items-center gap-2">
+            <CheckIcon className="w-4 h-4" />
+            Roles updated successfully!
+          </div>
+        )}
 
-        {/* Close Button */}
-        <button onClick={onClose} className="btn-secondary w-full">
-          Close
-        </button>
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="btn-secondary flex-1">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isUpdating || !hasChanges}
+            className="btn-primary flex-1"
+          >
+            {isUpdating ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       </div>
     </div>
   )

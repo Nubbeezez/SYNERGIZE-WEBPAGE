@@ -71,58 +71,82 @@ class ShopController extends Controller
             ], 400);
         }
 
-        // Check if user has enough credits
-        if ($user->credits < $item->price) {
-            return response()->json([
-                'error' => [
-                    'code' => 'INSUFFICIENT_CREDITS',
-                    'message' => 'You do not have enough credits for this purchase.',
-                    'details' => [
-                        'required' => $item->price,
-                        'current' => $user->credits,
-                    ],
-                ],
-            ], 400);
-        }
-
-        // Process purchase in transaction
+        // Process purchase in transaction with pessimistic locking to prevent race conditions
         try {
-            DB::transaction(function () use ($user, $item) {
-                // Deduct credits
-                $user->deductCredits($item->price);
+            $purchase = DB::transaction(function () use ($user, $item) {
+                // Lock user row for update to prevent concurrent credit modifications
+                $lockedUser = $user->lockForUpdate()->first() ?? $user->fresh();
+
+                // Re-check credits inside transaction with locked row
+                if ($lockedUser->credits < $item->price) {
+                    throw new \Exception('INSUFFICIENT_CREDITS');
+                }
+
+                // Lock and re-check item stock
+                $lockedItem = $item->lockForUpdate()->first() ?? $item->fresh();
+                if (!$lockedItem->isInStock()) {
+                    throw new \Exception('OUT_OF_STOCK');
+                }
+
+                // Deduct credits atomically
+                $lockedUser->decrement('credits', $item->price);
 
                 // Decrement stock if applicable
-                $item->decrementStock();
+                if ($lockedItem->stock !== null) {
+                    $lockedItem->decrement('stock');
+                }
 
                 // Calculate expiration for time-limited items
                 $expiresAt = null;
-                if ($durationDays = $item->getDurationDays()) {
+                if ($durationDays = $lockedItem->getDurationDays()) {
                     $expiresAt = now()->addDays($durationDays);
                 }
 
                 // Create purchase record
-                Purchase::create([
-                    'user_id' => $user->id,
-                    'shop_item_id' => $item->id,
-                    'price_paid' => $item->price,
+                $purchase = Purchase::create([
+                    'user_id' => $lockedUser->id,
+                    'shop_item_id' => $lockedItem->id,
+                    'price_paid' => $lockedItem->price,
                     'expires_at' => $expiresAt,
                     'status' => 'active',
                 ]);
 
                 // Log the purchase
                 AuditLog::log(
-                    $user->steam_id,
+                    $lockedUser->steam_id,
                     'shop.purchase',
                     'shop_item',
-                    $item->id,
+                    $lockedItem->id,
                     [
-                        'item_name' => $item->name,
-                        'price' => $item->price,
-                        'user_balance_after' => $user->fresh()->credits,
+                        'item_name' => $lockedItem->name,
+                        'price' => $lockedItem->price,
+                        'user_balance_after' => $lockedUser->fresh()->credits,
                     ]
                 );
+
+                return $purchase;
             });
         } catch (\Exception $e) {
+            $errorCode = $e->getMessage();
+
+            if ($errorCode === 'INSUFFICIENT_CREDITS') {
+                return response()->json([
+                    'error' => [
+                        'code' => 'INSUFFICIENT_CREDITS',
+                        'message' => 'You do not have enough credits for this purchase.',
+                    ],
+                ], 400);
+            }
+
+            if ($errorCode === 'OUT_OF_STOCK') {
+                return response()->json([
+                    'error' => [
+                        'code' => 'OUT_OF_STOCK',
+                        'message' => 'This item is no longer in stock.',
+                    ],
+                ], 400);
+            }
+
             return response()->json([
                 'error' => [
                     'code' => 'PURCHASE_FAILED',
