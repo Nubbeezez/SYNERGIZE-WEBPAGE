@@ -42,11 +42,15 @@ export function Navigation() {
       <div className="container-custom">
         <nav className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-accent flex items-center justify-center">
-              <span className="text-white font-bold text-lg">S</span>
-            </div>
-            <span className="text-h4 font-bold hidden sm:block">Synergize</span>
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo.png"
+              alt="Synergize"
+              width={140}
+              height={40}
+              className="h-10 w-auto"
+              priority
+            />
           </Link>
 
           {/* Desktop Navigation */}
