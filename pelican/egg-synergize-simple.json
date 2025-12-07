@@ -14,7 +14,7 @@
         "Node 18": "ghcr.io/parkervcp/yolks:nodejs_18"
     },
     "file_denylist": [],
-    "startup": "if [ -f package.json ]; then npm install && npm run dev; elif [ -f test.js ]; then node test.js; else echo 'No files found - please reinstall'; fi",
+    "startup": "if [ -d frontend ]; then cd frontend && npm install && npm run dev; elif [ -f package.json ]; then npm install && npm run dev; elif [ -f test.js ]; then node test.js; else echo 'No files found - please reinstall'; fi",
     "config": {
         "files": "{}",
         "startup": "{\"done\": \"ready started server on|Synergize test running\"}",
