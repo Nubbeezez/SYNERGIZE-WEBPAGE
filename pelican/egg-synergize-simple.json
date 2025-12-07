@@ -14,7 +14,7 @@
         "Node 18": "ghcr.io/parkervcp/yolks:nodejs_18"
     },
     "file_denylist": [],
-    "startup": "cd /home/container/frontend && if [ -d .next ]; then npm run start -- -H 0.0.0.0 -p ${PORT}; else npm install && npm run build && npm run start -- -H 0.0.0.0 -p ${PORT}; fi",
+    "startup": "cd /home/container/frontend && if [ -f .next/BUILD_ID ]; then npm run start -- -p ${PORT}; else npm install && npm run build && npm run start -- -p ${PORT}; fi",
     "config": {
         "files": "{}",
         "startup": "{\"done\": \"Ready in|ready started server on|Listening on\"}",
