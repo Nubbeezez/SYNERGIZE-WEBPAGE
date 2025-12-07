@@ -24,14 +24,52 @@ A modern, full-stack gaming community platform for Counter-Strike 2 servers feat
 ### Prerequisites
 
 1. Pelican Panel with access to create new eggs
-2. PostgreSQL database (external or panel-managed)
+2. PostgreSQL or MySQL database (external or panel-managed)
 3. Steam Web API Key ([Get one here](https://steamcommunity.com/dev/apikey))
 4. A domain name (optional but recommended)
 
-### Quick Start
+### Available Eggs
+
+Synergize provides **three Pelican eggs** for flexible deployment options:
+
+| Egg File | Description | Use Case |
+|----------|-------------|----------|
+| `egg-synergize.json` | **Combined** - Full stack (Frontend + Backend) | Simple single-server deployment |
+| `egg-synergize-simple.json` | **Frontend Only** - Next.js | Separate deployment (recommended for production) |
+| `egg-synergize-backend.json` | **Backend Only** - Laravel API | Separate deployment (recommended for production) |
+
+### Deployment Options
+
+#### Option A: Single Server (Combined Egg)
+
+Best for: Development, testing, or low-traffic deployments.
+
+1. Import `egg-synergize.json`
+2. Create one server with both frontend (port 3000) and backend (port 8000)
+3. Both services run in the same container
+
+#### Option B: Two Servers (Recommended for Production)
+
+Best for: Production deployments with better resource management and scaling.
+
+1. **Import both eggs:**
+   - `egg-synergize-backend.json` → Creates "Synergize Backend (Laravel)"
+   - `egg-synergize-simple.json` → Creates "Synergize Frontend (Next.js)"
+
+2. **Create Backend Server:**
+   - Use "Synergize Backend (Laravel)" egg
+   - Allocate port 8000 (or your preferred API port)
+   - Configure database and Steam API credentials
+
+3. **Create Frontend Server:**
+   - Use "Synergize Frontend (Next.js)" egg
+   - Allocate port 3000 (or your preferred web port)
+   - Set `NEXT_PUBLIC_API_URL` to your backend URL (e.g., `https://api.yoursite.com`)
+
+### Quick Start (Combined Egg)
 
 1. **Import the Egg**
-   - Download `egg-synergize.json` from the [releases page](../../releases)
+   - Download `egg-synergize.json` from the `pelican/` folder
    - In Pelican Panel: Admin → Eggs → Import Egg
    - Upload the JSON file
 
@@ -45,8 +83,8 @@ A modern, full-stack gaming community platform for Counter-Strike 2 servers feat
    | Variable | Description | Example |
    |----------|-------------|---------|
    | `APP_URL` | Your domain/IP | `https://synergize.example.com` |
-   | `DB_HOST` | PostgreSQL host | `postgres.example.com` |
-   | `DB_PORT` | PostgreSQL port | `5432` |
+   | `DB_HOST` | PostgreSQL/MySQL host | `postgres.example.com` |
+   | `DB_PORT` | Database port | `5432` (PostgreSQL) or `3306` (MySQL) |
    | `DB_DATABASE` | Database name | `synergize` |
    | `DB_USERNAME` | Database user | `synergize_user` |
    | `DB_PASSWORD` | Database password | `secure_password` |
