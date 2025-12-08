@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Server;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ServerController extends Controller
 {
     /**
      * List all servers with filtering and pagination.
+     * Results are cached for 30 seconds since server status changes frequently.
      */
     public function index(Request $request): JsonResponse
     {
@@ -23,6 +25,24 @@ class ServerController extends Controller
             'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 
+        // Generate cache key based on request parameters
+        $cacheKey = 'servers:list:' . md5(json_encode($request->only([
+            'search', 'status', 'region', 'sort', 'order', 'per_page', 'page'
+        ])));
+
+        // Cache for 30 seconds (server status changes frequently)
+        $result = Cache::remember($cacheKey, 30, function () use ($request) {
+            return $this->fetchServersData($request);
+        });
+
+        return response()->json($result);
+    }
+
+    /**
+     * Fetch servers data from database.
+     */
+    private function fetchServersData(Request $request): array
+    {
         $query = Server::query();
 
         // Filter by status
@@ -54,7 +74,7 @@ class ServerController extends Controller
         $perPage = min((int) $request->input('per_page', 20), 100);
         $servers = $query->paginate($perPage);
 
-        return response()->json([
+        return [
             'data' => $servers->items(),
             'meta' => [
                 'total' => $servers->total(),
@@ -62,7 +82,7 @@ class ServerController extends Controller
                 'per_page' => $servers->perPage(),
                 'last_page' => $servers->lastPage(),
             ],
-        ]);
+        ];
     }
 
     /**

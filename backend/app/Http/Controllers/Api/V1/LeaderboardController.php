@@ -8,13 +8,36 @@ use App\Models\User;
 use App\Services\SteamAuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class LeaderboardController extends Controller
 {
     /**
      * Get leaderboard with filtering and pagination.
+     * Results are cached for 5 minutes to reduce database load.
      */
     public function index(Request $request): JsonResponse
+    {
+        // Generate cache key based on request parameters
+        $cacheKey = 'leaderboard:' . md5(json_encode([
+            'server_id' => $request->input('server_id'),
+            'sort' => $request->input('sort', 'points'),
+            'per_page' => min((int) $request->input('per_page', 20), 100),
+            'page' => $request->input('page', 1),
+        ]));
+
+        // Cache for 5 minutes (300 seconds)
+        $result = Cache::remember($cacheKey, 300, function () use ($request) {
+            return $this->fetchLeaderboardData($request);
+        });
+
+        return response()->json($result);
+    }
+
+    /**
+     * Fetch leaderboard data from database.
+     */
+    private function fetchLeaderboardData(Request $request): array
     {
         $query = LeaderboardEntry::query();
 
@@ -38,9 +61,19 @@ class LeaderboardController extends Controller
         $perPage = min((int) $request->input('per_page', 20), 100);
         $entries = $query->paginate($perPage);
 
+        // Batch load users to avoid N+1 queries
+        $steamIds = collect($entries->items())
+            ->pluck('steam_id')
+            ->unique()
+            ->values();
+
+        $users = User::whereIn('steam_id', $steamIds)
+            ->get()
+            ->keyBy('steam_id');
+
         // Add rank and user info
-        $data = collect($entries->items())->map(function ($entry, $index) use ($entries) {
-            $user = User::where('steam_id', $entry->steam_id)->first();
+        $data = collect($entries->items())->map(function ($entry, $index) use ($entries, $users) {
+            $user = $users->get($entry->steam_id);
             $rank = ($entries->currentPage() - 1) * $entries->perPage() + $index + 1;
 
             return [
@@ -58,7 +91,7 @@ class LeaderboardController extends Controller
             ];
         });
 
-        return response()->json([
+        return [
             'data' => $data,
             'meta' => [
                 'total' => $entries->total(),
@@ -67,7 +100,7 @@ class LeaderboardController extends Controller
                 'last_page' => $entries->lastPage(),
                 'period' => $request->input('period', 'alltime'),
             ],
-        ]);
+        ];
     }
 
     /**

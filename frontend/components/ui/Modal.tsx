@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, type ReactNode } from 'react'
+import { Fragment, type ReactNode, useEffect, useRef, useCallback } from 'react'
 import { XMarkIcon } from '../icons'
 
 interface ModalProps {
@@ -27,6 +27,36 @@ export function Modal({
   size = 'md',
   showCloseButton = true,
 }: ModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null)
+  const previousActiveElement = useRef<HTMLElement | null>(null)
+
+  // Handle escape key
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose()
+    }
+  }, [onClose])
+
+  // Focus trap and keyboard handling
+  useEffect(() => {
+    if (isOpen) {
+      previousActiveElement.current = document.activeElement as HTMLElement
+      document.addEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = 'hidden'
+
+      // Focus the modal
+      setTimeout(() => {
+        modalRef.current?.focus()
+      }, 0)
+
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown)
+        document.body.style.overflow = ''
+        previousActiveElement.current?.focus()
+      }
+    }
+  }, [isOpen, handleKeyDown])
+
   if (!isOpen) return null
 
   return (
@@ -41,7 +71,9 @@ export function Modal({
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
-          className={`relative w-full ${sizeClasses[size]} bg-primary-light border border-white/10 rounded-xl shadow-xl animate-fade-in`}
+          ref={modalRef}
+          tabIndex={-1}
+          className={`relative w-full ${sizeClasses[size]} bg-primary-light border border-white/10 rounded-xl shadow-xl animate-fade-in focus:outline-none`}
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
@@ -58,10 +90,10 @@ export function Modal({
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="p-1 rounded-lg text-muted hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-1 rounded-lg text-muted hover:text-white hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-accent-pink/50"
                   aria-label="Close modal"
                 >
-                  <XMarkIcon className="w-5 h-5" />
+                  <XMarkIcon className="w-5 h-5" aria-hidden="true" />
                 </button>
               )}
             </div>

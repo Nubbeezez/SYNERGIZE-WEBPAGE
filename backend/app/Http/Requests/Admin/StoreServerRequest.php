@@ -43,14 +43,25 @@ class StoreServerRequest extends FormRequest
         $validator->after(function (Validator $validator) {
             $ip = $this->input('ip');
 
-            if ($ip && !$this->isValidIpOrHostname($ip)) {
+            if (!$ip) {
+                return;
+            }
+
+            if (!$this->isValidIpOrHostname($ip)) {
                 $validator->errors()->add('ip', 'Invalid IP address or hostname format.');
+                return;
             }
 
             // Block private/reserved IP ranges for security
-            if ($ip && filter_var($ip, FILTER_VALIDATE_IP)) {
+            if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                // Direct IP provided
                 if ($this->isPrivateOrReservedIp($ip)) {
                     $validator->errors()->add('ip', 'Private or reserved IP addresses are not allowed.');
+                }
+            } else {
+                // Hostname provided - resolve and check each IP
+                if ($this->hostnameResolvesToPrivateIp($ip)) {
+                    $validator->errors()->add('ip', 'Hostname resolves to a private or reserved IP address, which is not allowed.');
                 }
             }
         });
@@ -64,6 +75,17 @@ class StoreServerRequest extends FormRequest
         // Valid IPv4 or IPv6
         if (filter_var($value, FILTER_VALIDATE_IP)) {
             return true;
+        }
+
+        // Block dangerous hostnames
+        $blockedHostnames = ['localhost', 'localhost.localdomain', '127.0.0.1.nip.io'];
+        if (in_array(strtolower($value), $blockedHostnames, true)) {
+            return false;
+        }
+
+        // Block hostnames starting with local indicators
+        if (preg_match('/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/i', $value)) {
+            return false;
         }
 
         // Valid hostname (RFC 1123)
@@ -81,6 +103,39 @@ class StoreServerRequest extends FormRequest
             FILTER_VALIDATE_IP,
             FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
         );
+    }
+
+    /**
+     * Check if hostname resolves to a private or reserved IP.
+     */
+    private function hostnameResolvesToPrivateIp(string $hostname): bool
+    {
+        // Suppress warnings from gethostbynamel for invalid hostnames
+        $ips = @gethostbynamel($hostname);
+
+        if ($ips === false) {
+            // Could not resolve hostname - allow it (server might not be online yet)
+            // The server polling will fail if it's truly invalid
+            return false;
+        }
+
+        foreach ($ips as $ip) {
+            if ($this->isPrivateOrReservedIp($ip)) {
+                return true;
+            }
+        }
+
+        // Also check IPv6 addresses
+        $records = @dns_get_record($hostname, DNS_AAAA);
+        if ($records) {
+            foreach ($records as $record) {
+                if (isset($record['ipv6']) && $this->isPrivateOrReservedIp($record['ipv6'])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

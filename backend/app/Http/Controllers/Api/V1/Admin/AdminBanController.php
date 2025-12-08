@@ -45,11 +45,22 @@ class AdminBanController extends Controller
         $perPage = min((int) $request->input('per_page', 20), 100);
         $bans = $query->paginate($perPage);
 
-        $data = collect($bans->items())->map(function ($ban) {
-            $user = User::where('steam_id', $ban->steam_id)->first();
-            $actor = User::where('steam_id', $ban->actor_steam_id)->first();
+        // Batch load users to avoid N+1 queries
+        $steamIds = collect($bans->items())
+            ->flatMap(fn ($ban) => [$ban->steam_id, $ban->actor_steam_id, $ban->removed_by_steam_id])
+            ->filter()
+            ->unique()
+            ->values();
+
+        $users = User::whereIn('steam_id', $steamIds)
+            ->get()
+            ->keyBy('steam_id');
+
+        $data = collect($bans->items())->map(function ($ban) use ($users) {
+            $user = $users->get($ban->steam_id);
+            $actor = $users->get($ban->actor_steam_id);
             $removedBy = $ban->removed_by_steam_id
-                ? User::where('steam_id', $ban->removed_by_steam_id)->first()
+                ? $users->get($ban->removed_by_steam_id)
                 : null;
 
             return [

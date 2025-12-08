@@ -20,11 +20,11 @@ class AuthController extends Controller
      */
     public function steamInit(): JsonResponse
     {
-        $redirectUrl = $this->steamAuthService->getLoginUrl();
+        $authData = $this->steamAuthService->getLoginUrl();
 
         return response()->json([
             'data' => [
-                'redirect_url' => $redirectUrl,
+                'redirect_url' => $authData['url'],
             ],
         ]);
     }
@@ -36,6 +36,12 @@ class AuthController extends Controller
     {
         $params = $request->all();
         $frontendUrl = config('app.frontend_url', config('app.url'));
+
+        // Validate CSRF state parameter first
+        $state = $request->query('state');
+        if (!$this->steamAuthService->validateState($state)) {
+            return redirect($frontendUrl . '?error=invalid_state');
+        }
 
         // Validate the Steam response
         $steamId = $this->steamAuthService->validateCallback($params);

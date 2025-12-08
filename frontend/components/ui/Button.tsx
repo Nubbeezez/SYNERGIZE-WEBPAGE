@@ -44,6 +44,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || isLoading}
+        aria-busy={isLoading}
+        aria-disabled={disabled || isLoading}
         className={`
           inline-flex items-center justify-center gap-2 rounded-lg font-medium
           transition-colors focus:outline-none focus:ring-2 focus:ring-accent-pink/50
@@ -56,14 +58,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {isLoading ? (
           <>
-            <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" aria-hidden="true" />
             <span>Loading...</span>
           </>
         ) : (
           <>
-            {leftIcon && <span className="w-4 h-4">{leftIcon}</span>}
+            {leftIcon && <span className="w-4 h-4" aria-hidden="true">{leftIcon}</span>}
             {children}
-            {rightIcon && <span className="w-4 h-4">{rightIcon}</span>}
+            {rightIcon && <span className="w-4 h-4" aria-hidden="true">{rightIcon}</span>}
           </>
         )}
       </button>

@@ -45,9 +45,19 @@ class AdminLogController extends Controller
         $perPage = min((int) $request->input('per_page', 20), 100);
         $logs = $query->paginate($perPage);
 
+        // Batch load users to avoid N+1 queries
+        $steamIds = collect($logs->items())
+            ->pluck('actor_steam_id')
+            ->unique()
+            ->values();
+
+        $users = User::whereIn('steam_id', $steamIds)
+            ->get()
+            ->keyBy('steam_id');
+
         // Format response
-        $data = collect($logs->items())->map(function ($log) {
-            $actor = User::where('steam_id', $log->actor_steam_id)->first();
+        $data = collect($logs->items())->map(function ($log) use ($users) {
+            $actor = $users->get($log->actor_steam_id);
 
             return [
                 'id' => $log->id,

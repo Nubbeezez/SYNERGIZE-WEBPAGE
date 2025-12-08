@@ -77,4 +77,28 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Rate Limiting Configuration
+    |--------------------------------------------------------------------------
+    | Configure rate limits for different API endpoints. Values are requests
+    | per minute unless otherwise specified.
+    */
+
+    'rate_limits' => [
+        'api' => (int) env('RATE_LIMIT_API', 60),
+        'admin' => (int) env('RATE_LIMIT_ADMIN', 30),
+        'auth' => (int) env('RATE_LIMIT_AUTH', 5),
+        'sensitive' => (int) env('RATE_LIMIT_SENSITIVE', 10),
+        'purchases' => (int) env('RATE_LIMIT_PURCHASES', 5),
+    ],
+
 ];

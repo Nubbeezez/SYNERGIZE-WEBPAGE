@@ -1,0 +1,60 @@
+# =============================================================================
+# SYNERGIZE - PELICAN PANEL ENVIRONMENT VARIABLES
+# =============================================================================
+# Copy these into your Pelican server's environment variables
+# Replace all values in <brackets> with your actual values
+# =============================================================================
+
+# Application
+APP_NAME=Synergize
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://<your-domain.com>
+APP_KEY=
+
+# Frontend URL (same as APP_URL for single domain setup)
+FRONTEND_URL=https://<your-domain.com>
+
+# Database (PostgreSQL)
+DB_CONNECTION=pgsql
+DB_HOST=<database-host-or-container-name>
+DB_PORT=5432
+DB_DATABASE=synergize
+DB_USERNAME=synergize_user
+DB_PASSWORD=<your-strong-db-password>
+
+# Redis
+REDIS_HOST=<redis-host-or-container-name>
+REDIS_PASSWORD=<your-redis-password>
+REDIS_PORT=6379
+
+# Session
+SESSION_DRIVER=redis
+SESSION_LIFETIME=4320
+SESSION_ENCRYPT=true
+SESSION_DOMAIN=.<your-domain.com>
+SESSION_SECURE_COOKIE=true
+
+# Cache & Queue
+CACHE_STORE=redis
+QUEUE_CONNECTION=redis
+
+# Steam Authentication
+# Get your key from: https://steamcommunity.com/dev/apikey
+STEAM_API_KEY=<your-steam-api-key>
+STEAM_CALLBACK_URL=https://<your-domain.com>/api/v1/auth/steam/callback
+
+# Sanctum (Authentication)
+SANCTUM_STATEFUL_DOMAINS=<your-domain.com>,www.<your-domain.com>
+
+# Logging
+LOG_CHANNEL=stack
+LOG_LEVEL=warning
+
+# =============================================================================
+# FRONTEND CONTAINER (if separate)
+# =============================================================================
+NEXT_PUBLIC_API_URL=https://<your-domain.com>
+NEXT_PUBLIC_APP_NAME=Synergize
+NEXT_PUBLIC_SITE_URL=https://<your-domain.com>
+NODE_ENV=production
