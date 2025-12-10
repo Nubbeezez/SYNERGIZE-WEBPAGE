@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { adminApi, type AuditLog } from '@/lib/api'
+import { useDebounce } from '@/lib/hooks'
 import { DocumentIcon, MagnifyingGlassIcon, FilterIcon } from '@/components/icons'
 
 const actionTypes = [
@@ -23,10 +24,13 @@ export default function AdminLogsPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
+  // Debounce search to avoid excessive API calls
+  const debouncedActorSearch = useDebounce(actorSearch, 300)
+
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-logs', { actorSearch, action, dateFrom, dateTo }],
+    queryKey: ['admin-logs', { actorSearch: debouncedActorSearch, action, dateFrom, dateTo }],
     queryFn: () => adminApi.getLogs({
-      actor_steam_id: actorSearch || undefined,
+      actor_steam_id: debouncedActorSearch || undefined,
       action: action || undefined,
       from: dateFrom || undefined,
       to: dateTo || undefined,

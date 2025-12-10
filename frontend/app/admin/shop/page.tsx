@@ -13,6 +13,7 @@ import {
   XMarkIcon,
   CreditIcon,
 } from '@/components/icons'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 const ITEM_TYPES = [
   { value: 'vip', label: 'VIP' },
@@ -233,32 +234,18 @@ export default function AdminShopPage() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {userIsOwner && deletingItem && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="card max-w-md w-full">
-            <h2 className="text-h3 mb-4">Delete Item</h2>
-            <p className="text-muted mb-6">
-              Are you sure you want to delete <strong>{deletingItem.name}</strong>? This action
-              cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeletingItem(null)}
-                className="btn-secondary flex-1"
-                disabled={deleteMutation.isPending}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => deleteMutation.mutate(deletingItem.id)}
-                className="btn-primary bg-error hover:bg-error/80 flex-1"
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {userIsOwner && (
+        <ConfirmDialog
+          isOpen={!!deletingItem}
+          title="Delete Shop Item"
+          message={`Are you sure you want to delete "${deletingItem?.name}"? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="danger"
+          isLoading={deleteMutation.isPending}
+          onConfirm={() => deletingItem && deleteMutation.mutate(deletingItem.id)}
+          onCancel={() => setDeletingItem(null)}
+        />
       )}
     </div>
   )

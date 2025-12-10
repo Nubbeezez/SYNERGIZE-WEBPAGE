@@ -17,6 +17,7 @@ export interface User {
 interface AuthContextType {
   user: User | null
   isLoading: boolean
+  isAuthenticated: boolean
   error: string | null
   login: () => void
   logout: () => Promise<void>
@@ -59,7 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
       window.location.href = '/'
     } catch (err) {
-      console.error('Logout failed:', err)
+      // Set error state instead of logging to console
+      setError('Logout failed. Please try again.')
+      // Still clear user and redirect after a brief delay
+      setTimeout(() => {
+        setUser(null)
+        window.location.href = '/'
+      }, 1500)
     }
   }
 
@@ -67,8 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchUser()
   }
 
+  // Compute isAuthenticated based on user state
+  const isAuthenticated = user !== null
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, login, logout, refetch }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated, error, login, logout, refetch }}>
       {children}
     </AuthContext.Provider>
   )

@@ -13,17 +13,17 @@ import {
 import Link from 'next/link'
 
 export default function AdminDashboard() {
-  const { data: serversData } = useQuery({
+  const { data: serversData, isLoading: serversLoading } = useQuery({
     queryKey: ['admin-servers'],
     queryFn: () => serversApi.list(),
   })
 
-  const { data: bansData } = useQuery({
+  const { data: bansData, isLoading: bansLoading } = useQuery({
     queryKey: ['admin-bans'],
     queryFn: () => bansApi.list({ active: true }),
   })
 
-  const { data: leaderboardData } = useQuery({
+  const { data: leaderboardData, isLoading: leaderboardLoading } = useQuery({
     queryKey: ['admin-leaderboard'],
     queryFn: () => leaderboardsApi.list({ period: 'daily' }),
   })
@@ -50,24 +50,28 @@ export default function AdminDashboard() {
           label="Servers Online"
           value={`${onlineServers}/${servers.length}`}
           color="pink"
+          isLoading={serversLoading}
         />
         <StatCard
           icon={<UsersIcon className="w-6 h-6" />}
           label="Players Online"
           value={`${totalPlayers}/${totalSlots}`}
           color="cyan"
+          isLoading={serversLoading}
         />
         <StatCard
           icon={<ShieldIcon className="w-6 h-6" />}
           label="Active Bans"
           value={bansData?.meta?.total?.toString() || '0'}
           color="green"
+          isLoading={bansLoading}
         />
         <StatCard
           icon={<TrophyIcon className="w-6 h-6" />}
           label="Daily Active"
           value={players.length.toString()}
           color="yellow"
+          isLoading={leaderboardLoading}
         />
       </div>
 
@@ -100,19 +104,30 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="space-y-3">
-            {servers.slice(0, 4).map((server) => (
-              <div key={server.id} className="flex items-center justify-between p-3 bg-primary rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className={`w-2 h-2 rounded-full ${server.status === 'online' ? 'bg-accent-green' : 'bg-error'}`} />
-                  <span className="text-small">{server.name}</span>
+            {serversLoading ? (
+              [...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-primary rounded-lg animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <span className="w-2 h-2 rounded-full bg-primary-light" />
+                    <span className="h-4 w-24 bg-primary-light rounded" />
+                  </div>
+                  <span className="h-4 w-12 bg-primary-light rounded" />
                 </div>
-                <span className="text-small text-muted">
-                  {server.players}/{server.max_players}
-                </span>
-              </div>
-            ))}
-            {servers.length === 0 && (
+              ))
+            ) : servers.length === 0 ? (
               <p className="text-muted text-center py-4">No servers configured</p>
+            ) : (
+              servers.slice(0, 4).map((server) => (
+                <div key={server.id} className="flex items-center justify-between p-3 bg-primary rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-2 h-2 rounded-full ${server.status === 'online' ? 'bg-accent-green' : 'bg-error'}`} />
+                    <span className="text-small">{server.name}</span>
+                  </div>
+                  <span className="text-small text-muted">
+                    {server.players}/{server.max_players}
+                  </span>
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -129,24 +144,38 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="space-y-3">
-            {bans.slice(0, 5).map((ban) => (
-              <div key={ban.id} className="flex items-center justify-between p-3 bg-primary rounded-lg">
-                <div>
-                  <p className="text-small font-medium">{ban.username}</p>
-                  <p className="text-tiny text-muted">{ban.reason}</p>
+            {bansLoading ? (
+              [...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-primary rounded-lg animate-pulse">
+                  <div className="space-y-2">
+                    <div className="h-4 w-24 bg-primary-light rounded" />
+                    <div className="h-3 w-32 bg-primary-light rounded" />
+                  </div>
+                  <div className="space-y-2 text-right">
+                    <div className="h-3 w-12 bg-primary-light rounded ml-auto" />
+                    <div className="h-3 w-16 bg-primary-light rounded ml-auto" />
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className={`text-tiny ${ban.scope === 'global' ? 'text-error' : 'text-warning'}`}>
-                    {ban.scope}
-                  </p>
-                  <p className="text-tiny text-muted">
-                    {new Date(ban.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            ))}
-            {bans.length === 0 && (
+              ))
+            ) : bans.length === 0 ? (
               <p className="text-muted text-center py-4">No recent bans</p>
+            ) : (
+              bans.slice(0, 5).map((ban) => (
+                <div key={ban.id} className="flex items-center justify-between p-3 bg-primary rounded-lg">
+                  <div>
+                    <p className="text-small font-medium">{ban.username}</p>
+                    <p className="text-tiny text-muted">{ban.reason}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-tiny ${ban.scope === 'global' ? 'text-error' : 'text-warning'}`}>
+                      {ban.scope}
+                    </p>
+                    <p className="text-tiny text-muted">
+                      {new Date(ban.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -160,24 +189,35 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="space-y-3">
-            {players.slice(0, 5).map((player, index) => (
-              <div key={player.steam_id} className="flex items-center justify-between p-3 bg-primary rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-tiny font-bold ${
-                    index === 0 ? 'bg-highlight/20 text-highlight' :
-                    index === 1 ? 'bg-gray-300/20 text-gray-300' :
-                    index === 2 ? 'bg-amber-600/20 text-amber-600' :
-                    'bg-primary-light text-muted'
-                  }`}>
-                    {index + 1}
-                  </span>
-                  <span className="text-small">{player.username}</span>
+            {leaderboardLoading ? (
+              [...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-primary rounded-lg animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full bg-primary-light" />
+                    <span className="h-4 w-20 bg-primary-light rounded" />
+                  </div>
+                  <span className="h-4 w-16 bg-primary-light rounded" />
                 </div>
-                <span className="text-small text-accent-cyan">{player.points.toLocaleString()} pts</span>
-              </div>
-            ))}
-            {players.length === 0 && (
+              ))
+            ) : players.length === 0 ? (
               <p className="text-muted text-center py-4">No activity today</p>
+            ) : (
+              players.slice(0, 5).map((player, index) => (
+                <div key={player.steam_id} className="flex items-center justify-between p-3 bg-primary rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-tiny font-bold ${
+                      index === 0 ? 'bg-highlight/20 text-highlight' :
+                      index === 1 ? 'bg-gray-300/20 text-gray-300' :
+                      index === 2 ? 'bg-amber-600/20 text-amber-600' :
+                      'bg-primary-light text-muted'
+                    }`}>
+                      {index + 1}
+                    </span>
+                    <span className="text-small">{player.username}</span>
+                  </div>
+                  <span className="text-small text-accent-cyan">{player.points.toLocaleString()} pts</span>
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -191,9 +231,10 @@ interface StatCardProps {
   label: string
   value: string
   color: 'pink' | 'cyan' | 'green' | 'yellow'
+  isLoading?: boolean
 }
 
-function StatCard({ icon, label, value, color }: StatCardProps) {
+function StatCard({ icon, label, value, color, isLoading }: StatCardProps) {
   const colorClasses = {
     pink: 'text-accent-pink bg-accent-pink/10',
     cyan: 'text-accent-cyan bg-accent-cyan/10',
@@ -209,7 +250,11 @@ function StatCard({ icon, label, value, color }: StatCardProps) {
         </div>
         <div>
           <p className="text-small text-muted">{label}</p>
-          <p className="text-h3">{value}</p>
+          {isLoading ? (
+            <div className="h-8 w-16 bg-primary rounded animate-pulse" />
+          ) : (
+            <p className="text-h3">{value}</p>
+          )}
         </div>
       </div>
     </div>

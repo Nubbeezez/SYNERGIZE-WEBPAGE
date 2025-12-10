@@ -39,8 +39,18 @@ class StoreBanRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
-            if ($this->has('steam_id') && !SteamAuthService::isValidSteamId($this->steam_id)) {
-                $validator->errors()->add('steam_id', 'Invalid Steam ID format.');
+            if ($this->has('steam_id')) {
+                // Validate Steam ID format
+                if (!SteamAuthService::isValidSteamId($this->steam_id)) {
+                    $validator->errors()->add('steam_id', 'Invalid Steam ID format.');
+                    return;
+                }
+
+                // Check if user exists in database (optional - can ban users who haven't logged in yet)
+                // Uncomment below if you only want to ban existing users:
+                // if (!\App\Models\User::where('steam_id', $this->steam_id)->exists()) {
+                //     $validator->errors()->add('steam_id', 'No user found with this Steam ID.');
+                // }
             }
         });
     }

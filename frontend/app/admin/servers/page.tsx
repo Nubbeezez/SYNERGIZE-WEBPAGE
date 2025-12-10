@@ -13,6 +13,7 @@ import {
   XMarkIcon,
   UsersIcon,
 } from '@/components/icons'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 const REGIONS = [
   { value: 'NA', label: 'North America' },
@@ -192,33 +193,17 @@ export default function AdminServersPage() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {deletingServer && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="card max-w-md w-full">
-            <h2 className="text-h3 mb-4">Delete Server</h2>
-            <p className="text-muted mb-6">
-              Are you sure you want to delete <strong>{deletingServer.name}</strong>? This action
-              cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeletingServer(null)}
-                className="btn-secondary flex-1"
-                disabled={deleteMutation.isPending}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => deleteMutation.mutate(deletingServer.id)}
-                className="btn-primary bg-error hover:bg-error/80 flex-1"
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={!!deletingServer}
+        title="Delete Server"
+        message={`Are you sure you want to delete "${deletingServer?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => deletingServer && deleteMutation.mutate(deletingServer.id)}
+        onCancel={() => setDeletingServer(null)}
+      />
     </div>
   )
 }

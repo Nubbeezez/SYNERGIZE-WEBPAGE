@@ -3,16 +3,23 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bansApi, adminApi, serversApi, type Ban } from '@/lib/api'
+import { useDebounce } from '@/lib/hooks'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { ShieldIcon, MagnifyingGlassIcon, PlusIcon, TrashIcon } from '@/components/icons'
 
 export default function AdminBansPage() {
   const [search, setSearch] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const queryClient = useQueryClient()
+  const { confirm, setLoading, ConfirmDialog } = useConfirmDialog()
+
+  // Debounce search to avoid excessive API calls
+  const debouncedSearch = useDebounce(search, 300)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-bans', { search }],
-    queryFn: () => bansApi.list({ search: search || undefined }),
+    queryKey: ['admin-bans', { search: debouncedSearch }],
+    queryFn: () => bansApi.list({ search: debouncedSearch || undefined }),
   })
 
   const deleteMutation = useMutation({
@@ -23,11 +30,24 @@ export default function AdminBansPage() {
   })
 
   const handleDelete = async (ban: Ban) => {
-    if (!confirm(`Are you sure you want to remove the ban for ${ban.username}?`)) return
+    const confirmed = await confirm({
+      title: 'Remove Ban',
+      message: `Are you sure you want to remove the ban for ${ban.username}? This action cannot be undone.`,
+      confirmText: 'Remove Ban',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    })
+
+    if (!confirmed) return
+
+    setLoading(true)
     try {
       await deleteMutation.mutateAsync(ban.id)
+      setError(null)
     } catch (err) {
-      alert('Failed to remove ban')
+      setError('Failed to remove ban. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -48,6 +68,16 @@ export default function AdminBansPage() {
           New Ban
         </button>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 rounded-lg bg-error/20 text-error flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-error/70 hover:text-error">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Search */}
       <div className="mb-6">
@@ -150,6 +180,9 @@ export default function AdminBansPage() {
       {showCreateModal && (
         <CreateBanModal onClose={() => setShowCreateModal(false)} />
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog />
     </div>
   )
 }
@@ -164,6 +197,7 @@ function CreateBanModal({ onClose }: { onClose: () => void }) {
     custom_days: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const { data: serversData } = useQuery({
@@ -176,6 +210,7 @@ function CreateBanModal({ onClose }: { onClose: () => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setFormError(null)
 
     try {
       let expires_at: string | undefined
@@ -199,7 +234,7 @@ function CreateBanModal({ onClose }: { onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['admin-bans'] })
       onClose()
     } catch (err) {
-      alert('Failed to create ban')
+      setFormError('Failed to create ban. Please check the form and try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -209,6 +244,12 @@ function CreateBanModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="card max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
         <h2 className="text-h3 mb-6">Create New Ban</h2>
+
+        {formError && (
+          <div className="mb-4 p-3 rounded-lg bg-error/20 text-error text-small">
+            {formError}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

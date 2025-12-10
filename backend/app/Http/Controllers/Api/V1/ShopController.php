@@ -13,10 +13,16 @@ use Illuminate\Support\Facades\DB;
 class ShopController extends Controller
 {
     /**
-     * List all shop items.
+     * List all shop items with optional pagination.
      */
     public function index(Request $request): JsonResponse
     {
+        $request->validate([
+            'type' => 'nullable|string|in:perk,skin,role,other',
+            'available' => 'nullable|boolean',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
         $query = ShopItem::query();
 
         // Filter by type
@@ -29,9 +35,16 @@ class ShopController extends Controller
             $query->where('available', true);
         }
 
-        $items = $query->orderBy('price')->get();
+        $query->orderBy('price');
 
-        $data = $items->map(function ($item) {
+        // Use pagination if per_page is specified, otherwise return all (limited to 100)
+        $perPage = $request->has('per_page')
+            ? min((int) $request->input('per_page'), 100)
+            : 100;
+
+        $items = $query->paginate($perPage);
+
+        $data = collect($items->items())->map(function ($item) {
             return [
                 'id' => $item->id,
                 'name' => $item->name,
@@ -46,6 +59,12 @@ class ShopController extends Controller
 
         return response()->json([
             'data' => $data,
+            'meta' => [
+                'total' => $items->total(),
+                'page' => $items->currentPage(),
+                'per_page' => $items->perPage(),
+                'last_page' => $items->lastPage(),
+            ],
         ]);
     }
 

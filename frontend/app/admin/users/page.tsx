@@ -12,6 +12,7 @@ import {
   getRoleColor,
   ROLE_HIERARCHY,
 } from '@/lib/auth'
+import { useDebounce } from '@/lib/hooks'
 import { UsersIcon, MagnifyingGlassIcon, ShieldIcon, CheckIcon, XMarkIcon } from '@/components/icons'
 
 export default function AdminUsersPage() {
@@ -22,10 +23,13 @@ export default function AdminUsersPage() {
   const { user: currentUser } = useAuth()
   const queryClient = useQueryClient()
 
+  // Debounce search to avoid excessive API calls
+  const debouncedSearch = useDebounce(search, 300)
+
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-users', { search, role: roleFilter, page }],
+    queryKey: ['admin-users', { search: debouncedSearch, role: roleFilter, page }],
     queryFn: () => adminApi.getUsers({
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       role: roleFilter || undefined,
       page,
       per_page: 20,

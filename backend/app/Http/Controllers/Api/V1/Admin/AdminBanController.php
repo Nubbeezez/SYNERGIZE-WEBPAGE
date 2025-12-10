@@ -202,40 +202,69 @@ class AdminBanController extends Controller
 
         $actor = $request->user();
 
-        // Update ban record
-        $ban->update([
-            'is_active' => false,
-            'removal_reason' => $validated['reason'] ?? null,
-            'removed_by_steam_id' => $actor->steam_id,
-            'removed_at' => now(),
-        ]);
+        // Process ban removal atomically to prevent race conditions
+        try {
+            DB::transaction(function () use ($ban, $validated, $actor) {
+                // Lock the ban record for update
+                $lockedBan = Ban::where('id', $ban->id)->lockForUpdate()->first();
 
-        // Check if there are any other active global bans
-        $hasOtherGlobalBans = Ban::where('steam_id', $ban->steam_id)
-            ->where('id', '!=', $ban->id)
-            ->where('scope', 'global')
-            ->active()
-            ->exists();
+                if (!$lockedBan || !$lockedBan->is_active) {
+                    throw new \Exception('BAN_ALREADY_REMOVED');
+                }
 
-        // Update user ban status if no other global bans
-        if ($ban->scope === 'global' && !$hasOtherGlobalBans) {
-            User::where('steam_id', $ban->steam_id)->update([
-                'is_banned' => false,
-                'banned_until' => null,
-            ]);
+                // Update ban record
+                $lockedBan->update([
+                    'is_active' => false,
+                    'removal_reason' => $validated['reason'] ?? null,
+                    'removed_by_steam_id' => $actor->steam_id,
+                    'removed_at' => now(),
+                ]);
+
+                // Check if there are any other active global bans (within transaction)
+                $hasOtherGlobalBans = Ban::where('steam_id', $lockedBan->steam_id)
+                    ->where('id', '!=', $lockedBan->id)
+                    ->where('scope', 'global')
+                    ->active()
+                    ->lockForUpdate()
+                    ->exists();
+
+                // Update user ban status if no other global bans
+                if ($lockedBan->scope === 'global' && !$hasOtherGlobalBans) {
+                    User::where('steam_id', $lockedBan->steam_id)->update([
+                        'is_banned' => false,
+                        'banned_until' => null,
+                    ]);
+                }
+
+                // Log the action
+                AuditLog::log(
+                    $actor->steam_id,
+                    'ban.remove',
+                    'ban',
+                    $lockedBan->id,
+                    [
+                        'target_steam_id' => $lockedBan->steam_id,
+                        'removal_reason' => $validated['reason'] ?? null,
+                    ]
+                );
+            });
+        } catch (\Exception $e) {
+            if ($e->getMessage() === 'BAN_ALREADY_REMOVED') {
+                return response()->json([
+                    'error' => [
+                        'code' => 'BAN_ALREADY_REMOVED',
+                        'message' => 'This ban has already been removed.',
+                    ],
+                ], 400);
+            }
+
+            return response()->json([
+                'error' => [
+                    'code' => 'REMOVAL_FAILED',
+                    'message' => 'Failed to remove ban. Please try again.',
+                ],
+            ], 500);
         }
-
-        // Log the action
-        AuditLog::log(
-            $actor->steam_id,
-            'ban.remove',
-            'ban',
-            $ban->id,
-            [
-                'target_steam_id' => $ban->steam_id,
-                'removal_reason' => $validated['reason'] ?? null,
-            ]
-        );
 
         return response()->json([
             'data' => [

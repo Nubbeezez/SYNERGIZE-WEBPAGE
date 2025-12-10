@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { serversApi, type Server } from '@/lib/api'
+import { useDebounce } from '@/lib/hooks'
 import { ServerCard } from '@/components/ServerCard'
 import { MagnifyingGlassIcon } from '@/components/icons'
 
@@ -20,14 +21,17 @@ export default function ServersPage() {
   const [region, setRegion] = useState('')
   const [status, setStatus] = useState<string>('')
 
+  // Debounce search to avoid excessive API calls
+  const debouncedSearch = useDebounce(search, 300)
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['servers', { search, region, status }],
+    queryKey: ['servers', { search: debouncedSearch, region, status }],
     queryFn: () => serversApi.list({
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       region: region || undefined,
       status: status || undefined,
     }),
-    refetchInterval: 15000, // Refresh every 15 seconds
+    refetchInterval: 30000, // Refresh every 30 seconds
   })
 
   const servers = data?.data || []

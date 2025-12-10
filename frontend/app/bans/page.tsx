@@ -15,13 +15,31 @@ export default function BansPage() {
   const [search, setSearch] = useState('')
   const [scope, setScope] = useState('')
   const [activeOnly, setActiveOnly] = useState(true)
+  const [page, setPage] = useState(1)
+
+  // Reset to page 1 when filters change
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setPage(1)
+  }
+
+  const handleScopeChange = (value: string) => {
+    setScope(value)
+    setPage(1)
+  }
+
+  const handleActiveOnlyChange = (value: boolean) => {
+    setActiveOnly(value)
+    setPage(1)
+  }
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['bans', { search, scope, active: activeOnly }],
+    queryKey: ['bans', { search, scope, active: activeOnly, page }],
     queryFn: () => bansApi.list({
       search: search || undefined,
       scope: scope || undefined,
       active: activeOnly,
+      page,
     }),
     refetchInterval: 30000,
   })
@@ -54,7 +72,7 @@ export default function BansPage() {
               type="text"
               placeholder="Search by Steam ID or username..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="input pl-10"
             />
           </div>
@@ -62,7 +80,7 @@ export default function BansPage() {
           {/* Scope filter */}
           <select
             value={scope}
-            onChange={(e) => setScope(e.target.value)}
+            onChange={(e) => handleScopeChange(e.target.value)}
             className="input w-full md:w-48"
           >
             {scopes.map((s) => (
@@ -77,7 +95,7 @@ export default function BansPage() {
             <input
               type="checkbox"
               checked={activeOnly}
-              onChange={(e) => setActiveOnly(e.target.checked)}
+              onChange={(e) => handleActiveOnlyChange(e.target.checked)}
               className="w-4 h-4 rounded border-primary bg-primary text-accent-pink focus:ring-accent-pink"
             />
             <span className="text-small">Active bans only</span>
@@ -144,9 +162,90 @@ export default function BansPage() {
 
         {/* Pagination */}
         {data?.meta && data.meta.last_page > 1 && (
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <div className="flex items-center gap-2">
+              {/* Previous button */}
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-2 rounded bg-primary hover:bg-primary-light disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                ← Prev
+              </button>
+
+              {/* Page numbers */}
+              <div className="flex items-center gap-1">
+                {/* First page */}
+                {page > 3 && (
+                  <>
+                    <button
+                      onClick={() => setPage(1)}
+                      className="w-10 h-10 rounded bg-primary hover:bg-primary-light transition-colors"
+                    >
+                      1
+                    </button>
+                    {page > 4 && <span className="px-2 text-muted">...</span>}
+                  </>
+                )}
+
+                {/* Pages around current */}
+                {Array.from({ length: Math.min(5, data.meta.last_page) }, (_, i) => {
+                  let pageNum: number
+                  if (data.meta.last_page <= 5) {
+                    pageNum = i + 1
+                  } else if (page <= 3) {
+                    pageNum = i + 1
+                  } else if (page >= data.meta.last_page - 2) {
+                    pageNum = data.meta.last_page - 4 + i
+                  } else {
+                    pageNum = page - 2 + i
+                  }
+
+                  if (pageNum < 1 || pageNum > data.meta.last_page) return null
+                  if (page > 3 && pageNum === 1) return null
+                  if (page < data.meta.last_page - 2 && pageNum === data.meta.last_page) return null
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(pageNum)}
+                      className={`w-10 h-10 rounded transition-colors ${
+                        page === pageNum
+                          ? 'bg-accent-pink text-white'
+                          : 'bg-primary hover:bg-primary-light'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+
+                {/* Last page */}
+                {page < data.meta.last_page - 2 && (
+                  <>
+                    {page < data.meta.last_page - 3 && <span className="px-2 text-muted">...</span>}
+                    <button
+                      onClick={() => setPage(data.meta.last_page)}
+                      className="w-10 h-10 rounded bg-primary hover:bg-primary-light transition-colors"
+                    >
+                      {data.meta.last_page}
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Next button */}
+              <button
+                onClick={() => setPage(p => Math.min(data.meta.last_page, p + 1))}
+                disabled={page === data.meta.last_page}
+                className="px-3 py-2 rounded bg-primary hover:bg-primary-light disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next →
+              </button>
+            </div>
+
             <p className="text-muted text-small">
-              Showing {bans.length} of {data.meta.total} bans
+              Page {page} of {data.meta.last_page} • Showing {bans.length} of {data.meta.total} bans
             </p>
           </div>
         )}

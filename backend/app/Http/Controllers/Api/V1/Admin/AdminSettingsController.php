@@ -11,6 +11,29 @@ use Illuminate\Http\Request;
 class AdminSettingsController extends Controller
 {
     /**
+     * Whitelist of allowed setting keys.
+     * Only these keys can be updated through the API.
+     */
+    private const ALLOWED_SETTINGS = [
+        'site_name',
+        'site_description',
+        'maintenance_mode',
+        'registration_enabled',
+        'shop_enabled',
+        'leaderboard_enabled',
+        'discord_invite_url',
+        'steam_group_url',
+        'announcement_text',
+        'announcement_enabled',
+        'min_credits_purchase',
+        'max_credits_purchase',
+        'daily_credit_limit',
+        'vip_price',
+        'ban_appeal_enabled',
+        'contact_email',
+    ];
+
+    /**
      * Get all settings (admin view).
      */
     public function index(): JsonResponse
@@ -42,10 +65,25 @@ class AdminSettingsController extends Controller
             'value' => 'required',
         ]);
 
+        // Validate key is in whitelist
+        if (!in_array($request->key, self::ALLOWED_SETTINGS, true)) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVALID_KEY',
+                    'message' => 'This setting key is not allowed to be modified.',
+                ],
+            ], 400);
+        }
+
         $setting = SiteSetting::where('key', $request->key)->first();
 
         if (!$setting) {
-            return response()->json(['error' => 'Setting not found'], 404);
+            return response()->json([
+                'error' => [
+                    'code' => 'NOT_FOUND',
+                    'message' => 'Setting not found.',
+                ],
+            ], 404);
         }
 
         // Validate value type matches setting type
@@ -102,6 +140,18 @@ class AdminSettingsController extends Controller
             'settings.*.key' => 'required|string',
             'settings.*.value' => 'required',
         ]);
+
+        // Validate all keys are in whitelist first
+        foreach ($request->settings as $item) {
+            if (!in_array($item['key'], self::ALLOWED_SETTINGS, true)) {
+                return response()->json([
+                    'error' => [
+                        'code' => 'INVALID_KEY',
+                        'message' => "Setting key '{$item['key']}' is not allowed to be modified.",
+                    ],
+                ], 400);
+            }
+        }
 
         $updated = [];
 
@@ -166,7 +216,7 @@ class AdminSettingsController extends Controller
                 ? null
                 : 'Value must be a boolean.',
 
-            'integer' => is_numeric($value) && (int) $value == $value
+            'integer' => (is_int($value) || (is_string($value) && ctype_digit(ltrim($value, '-'))))
                 ? null
                 : 'Value must be an integer.',
 
