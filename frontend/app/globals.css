@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Space+Grotesk:wght@300..700&family=Permanent+Marker&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -54,6 +54,19 @@
   .btn-primary {
     @apply btn bg-accent-pink text-white;
     @apply hover:bg-accent-pink/90 hover:shadow-neon-pink;
+  }
+
+  .btn-glow {
+    animation: buttonGlow 2s ease-in-out infinite;
+  }
+
+  @keyframes buttonGlow {
+    0%, 100% {
+      box-shadow: 0 0 5px rgba(247, 0, 148, 0.4), 0 0 10px rgba(247, 0, 148, 0.2);
+    }
+    50% {
+      box-shadow: 0 0 15px rgba(247, 0, 148, 0.6), 0 0 30px rgba(247, 0, 148, 0.3);
+    }
   }
 
   .btn-secondary {
@@ -147,7 +160,10 @@
 
   /* Gradient text */
   .gradient-text {
-    @apply bg-gradient-accent bg-clip-text text-transparent;
+    background: linear-gradient(90deg, #00e5ff 0%, #fff200 50%, #ff0080 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   /* Neon border effect */
@@ -223,11 +239,43 @@
     animation: fadeIn 0.2s ease-out;
   }
 
+  .animate-loading-bar {
+    animation: loadingBar 1.5s ease-in-out infinite;
+  }
+
   /* Gradient utilities */
   .bg-gradient-mesh {
+    position: relative;
     background-image:
-      radial-gradient(at 40% 20%, rgba(247, 0, 148, 0.1) 0px, transparent 50%),
-      radial-gradient(at 80% 0%, rgba(0, 255, 255, 0.1) 0px, transparent 50%),
-      radial-gradient(at 0% 50%, rgba(0, 247, 165, 0.05) 0px, transparent 50%);
+      radial-gradient(at 50% 0%, rgba(247, 0, 148, 0.15) 0px, transparent 50%),
+      radial-gradient(at 90% 10%, rgba(0, 255, 255, 0.12) 0px, transparent 40%),
+      radial-gradient(at 10% 60%, rgba(0, 247, 165, 0.08) 0px, transparent 50%);
+  }
+
+  /* Grid pattern overlay */
+  .bg-grid-pattern {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+
+  /* Glowing text effect */
+  .text-glow-pink {
+    text-shadow: 0 0 20px rgba(247, 0, 148, 0.5), 0 0 40px rgba(247, 0, 148, 0.3);
+  }
+
+  .text-glow-cyan {
+    text-shadow: 0 0 20px rgba(0, 255, 255, 0.5), 0 0 40px rgba(0, 255, 255, 0.3);
+  }
+
+  /* Glassmorphism card */
+  .glass-card {
+    @apply bg-primary-light/60 backdrop-blur-sm border border-white/10;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300;
+    @apply hover:bg-primary-light/80 hover:border-white/20 hover:-translate-y-1;
   }
 }

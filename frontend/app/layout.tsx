@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { Navigation } from '@/components/Navigation'
 import { Footer } from '@/components/Footer'
+import { LoadingScreen } from '@/components/LoadingScreen'
 import { Providers } from './providers'
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://synergize.example.com'
@@ -76,6 +77,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen flex flex-col">
         <Providers>
+          <LoadingScreen />
           <Navigation />
           <main className="flex-1">
             {children}

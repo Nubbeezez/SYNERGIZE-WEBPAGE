@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Server;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreServerRequest extends FormRequest
@@ -28,6 +30,7 @@ class StoreServerRequest extends FormRequest
             'ip' => 'required|string|max:255',
             'port' => 'required|integer|between:1,65535',
             'region' => 'required|string|max:10',
+            'game_mode' => ['sometimes', 'nullable', 'string', Rule::in(Server::GAME_MODES)],
             'max_players' => 'required|integer|between:1,128',
             'tags' => 'sometimes|array|max:10',
             'tags.*' => 'string|max:50',
@@ -156,6 +159,7 @@ class StoreServerRequest extends FormRequest
             'region.max' => 'Region code cannot exceed 10 characters.',
             'max_players.required' => 'Maximum players is required.',
             'max_players.between' => 'Maximum players must be between 1 and 128.',
+            'game_mode.in' => 'Invalid game mode. Valid modes are: ' . implode(', ', Server::GAME_MODES),
             'tags.max' => 'Maximum 10 tags allowed.',
             'tags.*.max' => 'Each tag cannot exceed 50 characters.',
         ];

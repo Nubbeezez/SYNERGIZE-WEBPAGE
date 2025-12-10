@@ -43,18 +43,18 @@ const config: Config = {
       // Typography
       fontFamily: {
         sans: ['DM Sans', 'system-ui', 'sans-serif'],
-        heading: ['DM Sans', 'system-ui', 'sans-serif'],
+        heading: ['Space Grotesk', 'system-ui', 'sans-serif'],
       },
 
       fontSize: {
-        'display': ['4rem', { lineHeight: '1.1', fontWeight: '700' }],
-        'h1': ['2.5rem', { lineHeight: '1.2', fontWeight: '700' }],
-        'h2': ['2rem', { lineHeight: '1.3', fontWeight: '600' }],
-        'h3': ['1.5rem', { lineHeight: '1.4', fontWeight: '600' }],
-        'h4': ['1.25rem', { lineHeight: '1.5', fontWeight: '500' }],
+        'display': ['5rem', { lineHeight: '1', fontWeight: '700', letterSpacing: '-0.02em' }],
+        'h1': ['3rem', { lineHeight: '1.1', fontWeight: '700', letterSpacing: '-0.01em' }],
+        'h2': ['2.25rem', { lineHeight: '1.2', fontWeight: '600', letterSpacing: '-0.01em' }],
+        'h3': ['1.75rem', { lineHeight: '1.3', fontWeight: '600' }],
+        'h4': ['1.25rem', { lineHeight: '1.4', fontWeight: '600' }],
         'body': ['1rem', { lineHeight: '1.6' }],
         'small': ['0.875rem', { lineHeight: '1.5' }],
-        'tiny': ['0.75rem', { lineHeight: '1.4' }],
+        'tiny': ['0.75rem', { lineHeight: '1.4', letterSpacing: '0.05em' }],
       },
 
       // Spacing (4px base)
@@ -138,6 +138,11 @@ const config: Config = {
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
+        },
+        loadingBar: {
+          '0%': { transform: 'translateX(-100%)', width: '30%' },
+          '50%': { width: '50%' },
+          '100%': { transform: 'translateX(400%)', width: '30%' },
         },
       },
 

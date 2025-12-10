@@ -20,6 +20,7 @@ class ServerController extends Controller
             'search' => 'nullable|string|max:100',
             'status' => 'nullable|string|in:online,offline',
             'region' => 'nullable|string|max:10',
+            'game_mode' => 'nullable|string|in:' . implode(',', Server::GAME_MODES),
             'sort' => 'nullable|string|in:name,players,created_at,region',
             'order' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:1|max:100',
@@ -27,7 +28,7 @@ class ServerController extends Controller
 
         // Generate cache key based on request parameters
         $cacheKey = 'servers:list:' . md5(json_encode($request->only([
-            'search', 'status', 'region', 'sort', 'order', 'per_page', 'page'
+            'search', 'status', 'region', 'game_mode', 'sort', 'order', 'per_page', 'page'
         ])));
 
         // Cache for 30 seconds (server status changes frequently)
@@ -53,6 +54,11 @@ class ServerController extends Controller
         // Filter by region
         if ($request->filled('region')) {
             $query->where('region', $request->input('region'));
+        }
+
+        // Filter by game mode
+        if ($request->filled('game_mode')) {
+            $query->where('game_mode', $request->input('game_mode'));
         }
 
         // Search by name (escape LIKE wildcards to prevent pattern injection)
@@ -97,6 +103,7 @@ class ServerController extends Controller
                 'ip' => $server->ip,
                 'port' => $server->port,
                 'region' => $server->region,
+                'game_mode' => $server->game_mode,
                 'status' => $server->status,
                 'map' => $server->map,
                 'players' => $server->players,

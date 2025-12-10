@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { leaderboardsApi, serversApi, type LeaderboardEntry } from '@/lib/api'
+import { leaderboardsApi, type LeaderboardEntry } from '@/lib/api'
 import { TrophyIcon, MagnifyingGlassIcon } from '@/components/icons'
 
 const periods = [
@@ -20,28 +20,32 @@ const sortOptions = [
   { value: 'hours', label: 'Hours Played' },
 ]
 
+const gameModes = [
+  { value: '', label: 'All Modes' },
+  { value: 'retake', label: 'Retake' },
+  { value: 'surf', label: 'Surf' },
+  { value: 'dm', label: 'Deathmatch' },
+  { value: 'awp', label: 'AWP' },
+  { value: 'kz', label: 'KZ' },
+  { value: 'bhop', label: 'Bhop' },
+]
+
 export default function LeaderboardsPage() {
   const [period, setPeriod] = useState('all')
   const [sortBy, setSortBy] = useState('points')
-  const [serverId, setServerId] = useState<number | undefined>()
+  const [gameMode, setGameMode] = useState('')
   const [search, setSearch] = useState('')
 
-  const { data: serversData } = useQuery({
-    queryKey: ['servers'],
-    queryFn: () => serversApi.list({ status: 'online' }),
-  })
-
   const { data, isLoading, error } = useQuery({
-    queryKey: ['leaderboards', { period, sortBy, serverId }],
+    queryKey: ['leaderboards', { period, sortBy, gameMode }],
     queryFn: () => leaderboardsApi.list({
       period: period !== 'all' ? period : undefined,
       sort: sortBy,
-      server_id: serverId,
+      game_mode: gameMode || undefined,
     }),
     refetchInterval: 60000,
   })
 
-  const servers = serversData?.data || []
   const entries = data?.data || []
 
   const filteredEntries = search
@@ -102,16 +106,15 @@ export default function LeaderboardsPage() {
             ))}
           </select>
 
-          {/* Server filter */}
+          {/* Game mode filter */}
           <select
-            value={serverId || ''}
-            onChange={(e) => setServerId(e.target.value ? Number(e.target.value) : undefined)}
+            value={gameMode}
+            onChange={(e) => setGameMode(e.target.value)}
             className="input w-full lg:w-48"
           >
-            <option value="">All Servers</option>
-            {servers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
+            {gameModes.map((mode) => (
+              <option key={mode.value} value={mode.value}>
+                {mode.label}
               </option>
             ))}
           </select>

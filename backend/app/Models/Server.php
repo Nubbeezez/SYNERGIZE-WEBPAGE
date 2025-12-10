@@ -13,6 +13,20 @@ class Server extends Model
     use HasFactory;
 
     /**
+     * Valid game modes for servers.
+     */
+    public const GAME_MODES = [
+        'retake',
+        'surf',
+        'dm',
+        'awp',
+        'kz',
+        'bhop',
+        'comp',
+        'casual',
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -23,6 +37,7 @@ class Server extends Model
         'port',
         'rcon_password',
         'region',
+        'game_mode',
         'tags',
         'status',
         'map',
@@ -128,5 +143,13 @@ class Server extends Model
     public function scopeRegion($query, string $region)
     {
         return $query->where('region', $region);
+    }
+
+    /**
+     * Scope to filter by game mode.
+     */
+    public function scopeGameMode($query, string $gameMode)
+    {
+        return $query->where('game_mode', $gameMode);
     }
 }
